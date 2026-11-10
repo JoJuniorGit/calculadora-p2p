@@ -1,0 +1,293 @@
+.panel {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.calculatorCard,
+.resultsCard,
+.waterfallCard {
+  min-width: 0;
+}
+
+.formContent {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.entryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.profileField {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.modeField {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 0.9rem;
+  font-weight: 620;
+  line-height: 1.35;
+}
+
+.modeSelector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.modeButton {
+  min-width: 0;
+  min-height: 42px;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 620;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.modeButton:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.modeButtonActive,
+.modeButtonActive:hover {
+  border-color: var(--primary);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  color: var(--primary);
+}
+
+.rateSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.rateItem {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.rateItem dt {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.rateItem dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.rateDetail {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.rateHint,
+.errorFeedback,
+.successFeedback,
+.lossBanner {
+  min-width: 0;
+  margin: 0;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.rateHint {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.errorFeedback,
+.lossBanner {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.successFeedback {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.toggleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem 1rem;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.fixedFeeNote {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.actionRow {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.registerButton {
+  min-width: 12rem;
+}
+
+.profitabilitySummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem 1rem;
+  min-width: 0;
+  margin-bottom: 1rem;
+}
+
+.trafficLight {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.profitabilityLegend {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.resultGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.metricCard {
+  display: grid;
+  align-content: start;
+  gap: 0.32rem;
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.primaryMetric {
+  grid-column: 1 / -1;
+  padding: 1.1rem;
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.metricLabel {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.metricValue {
+  min-width: 0;
+  font-size: 1.12rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.primaryMetric .metricValue {
+  color: var(--primary);
+  font-size: clamp(1.45rem, 4vw, 2.1rem);
+}
+
+.metricDetail {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.positiveValue {
+  color: var(--success);
+}
+
+.negativeValue {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .entryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profileField {
+    grid-column: auto;
+  }
+
+  .toggleGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resultGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .toggleGrid,
+  .resultGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .registerButton {
+    width: 100%;
+  }
+}

@@ -93,7 +93,7 @@ reproducible from its snapshot even after profiles/rates change.
 | T1 | Domain: engine + round2 + waterfall + break-even, Zod schemas, status machine, KPIs + Vitest | delegated worker | completed |
 | T2 | Zustand store with persist/schemaVersion/migrate + export/import JSON/CSV + tests | delegated worker | completed |
 | T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | completed |
-| T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | pending |
+| T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | completed |
 | T5 | Records: KPIs, filters, table/cards, detail, status flow + completion modal, export/import UI, README | delegated worker | pending |
 | T6 | Integration wiring, full test/build, independent verification | direct inline + verify | pending |
 
@@ -138,4 +138,7 @@ reproducible from its snapshot even after profiles/rates change.
 - T3 completed: UI kit + app shell + rates auto/manual panel + profiles CRUD +
   settings/disclaimer/config exchange. Stray unused `ConfirmDialog.module.css` removed
   by the parent. Build (88 modules) and 48 tests green. `dist/` is gitignored.
-- Next: T4 calculator panel + waterfall.
+- T4 completed: reactive dual-mode calculator (Bs.S invested / USD requested), profile
+  fee toggles per calculation, highlighted Binance amount + break-even + min gap,
+  traffic light and loss alert, responsive waterfall. Build and 48 tests green.
+- Next: T5 records/KPIs/detail/status flow + README.
