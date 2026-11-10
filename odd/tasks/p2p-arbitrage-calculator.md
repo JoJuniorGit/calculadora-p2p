@@ -92,7 +92,7 @@ reproducible from its snapshot even after profiles/rates change.
 | T0 | Scaffold revised: deps, proxy, CSS module base, shared types/utils, git init | direct inline | completed |
 | T1 | Domain: engine + round2 + waterfall + break-even, Zod schemas, status machine, KPIs + Vitest | delegated worker | completed |
 | T2 | Zustand store with persist/schemaVersion/migrate + export/import JSON/CSV + tests | delegated worker | completed |
-| T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | pending |
+| T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | completed |
 | T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | pending |
 | T5 | Records: KPIs, filters, table/cards, detail, status flow + completion modal, export/import UI, README | delegated worker | pending |
 | T6 | Integration wiring, full test/build, independent verification | direct inline + verify | pending |
@@ -135,4 +135,7 @@ reproducible from its snapshot even after profiles/rates change.
   JSON/CSV export-import (RFC4180 + validated imports). 14 new tests; full suite
   48 green. Vitest stabilized with a single fork because parallel workers crashed
   intermittently with native zone-allocation errors on Windows/Node 24.
-- Next: T3 UI kit + app shell + rates/profiles/settings.
+- T3 completed: UI kit + app shell + rates auto/manual panel + profiles CRUD +
+  settings/disclaimer/config exchange. Stray unused `ConfirmDialog.module.css` removed
+  by the parent. Build (88 modules) and 48 tests green. `dist/` is gitignored.
+- Next: T4 calculator panel + waterfall.

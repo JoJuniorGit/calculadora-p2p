@@ -1,0 +1,132 @@
+.app {
+  min-height: 100vh;
+  padding: clamp(1rem, 3vw, 2rem) 1rem;
+}
+
+.container {
+  display: grid;
+  gap: 1.2rem;
+  width: min(100%, 1160px);
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  min-width: 0;
+  padding-bottom: 0.25rem;
+}
+
+.brand {
+  min-width: 0;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.brand p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.disclaimer {
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  min-height: 40px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 620;
+}
+
+.tab:hover {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.tab[aria-current='page'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.content {
+  display: grid;
+  gap: 1.2rem;
+  min-width: 0;
+}
+
+.content > section {
+  min-width: 0;
+}
+
+.content p {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .app {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .headerActions > button {
+    flex: 1 1 140px;
+  }
+
+  .tabs {
+    gap: 0.25rem;
+  }
+
+  .tab {
+    flex: 1 1 auto;
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
+  }
+}

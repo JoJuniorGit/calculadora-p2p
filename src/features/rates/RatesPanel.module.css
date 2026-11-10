@@ -1,0 +1,110 @@
+.panel {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.rateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.rateCard {
+  min-width: 0;
+}
+
+.rateCardContent {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.rateMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.updatedAt {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.gapCard {
+  min-width: 0;
+}
+
+.gapContent {
+  display: grid;
+  justify-items: start;
+  gap: 0.9rem;
+}
+
+.gapValues {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.gapValues > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.metricLabel {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.metricValue {
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.gapHint,
+.footerNote {
+  margin: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.footerNote {
+  padding: 0.25rem 0.1rem;
+  font-size: 0.88rem;
+}
+
+.errorNotice,
+.successNotice {
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.errorNotice {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.successNotice {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+@media (max-width: 720px) {
+  .rateGrid,
+  .gapValues {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
