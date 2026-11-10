@@ -91,7 +91,7 @@ reproducible from its snapshot even after profiles/rates change.
 | --- | --- | --- | --- |
 | T0 | Scaffold revised: deps, proxy, CSS module base, shared types/utils, git init | direct inline | completed |
 | T1 | Domain: engine + round2 + waterfall + break-even, Zod schemas, status machine, KPIs + Vitest | delegated worker | completed |
-| T2 | Zustand store with persist/schemaVersion/migrate + export/import JSON/CSV + tests | delegated worker | pending |
+| T2 | Zustand store with persist/schemaVersion/migrate + export/import JSON/CSV + tests | delegated worker | completed |
 | T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | pending |
 | T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | pending |
 | T5 | Records: KPIs, filters, table/cards, detail, status flow + completion modal, export/import UI, README | delegated worker | pending |
@@ -131,3 +131,8 @@ reproducible from its snapshot even after profiles/rates change.
 - T1 completed: TDD RED (4 missing suites) → GREEN (34 tests / 4 files), build verified.
   Files: calculations, validation, purchases, kpis. Parent spot-check confirmed fee
   bases, break-even precision, KPI aggregation.
+- T2 completed: persist store (schemaVersion 1, migrate v0, Zod merge), demo data,
+  JSON/CSV export-import (RFC4180 + validated imports). 14 new tests; full suite
+  48 green. Vitest stabilized with a single fork because parallel workers crashed
+  intermittently with native zone-allocation errors on Windows/Node 24.
+- Next: T3 UI kit + app shell + rates/profiles/settings.

@@ -19,5 +19,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Single fork keeps Vitest stable on Windows/Node 24 (parallel workers
+    // intermittently crash with native zone-allocation errors on this machine).
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
+    fileParallelism: false,
   },
 });
