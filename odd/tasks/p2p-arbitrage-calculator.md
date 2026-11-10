@@ -165,3 +165,6 @@ reproducible from its snapshot even after profiles/rates change.
   panel shows the adjusted base and formula hint, calculator label clarified. Tests
   updated for the new baseline; `minGapPct` unchanged because break-even already
   includes the intervention cost.
+- Tooling addition: `iniciar.bat` performs a one-click Windows start (checks Node/npm,
+  installs dependencies on first run, launches Vite and opens the browser). Verified
+  with `iniciar.bat --no-open`: HTTP 200 and expected page title. README updated.

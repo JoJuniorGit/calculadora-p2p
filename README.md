@@ -22,6 +22,16 @@ npm run test:watch
 
 `npm run build` ejecuta primero `tsc --noEmit` y luego genera la aplicación estática con Vite.
 
+### Inicio en Windows con un clic
+
+Doble clic en `iniciar.bat` (en la raíz del proyecto). El archivo verifica Node.js/npm, instala las dependencias si todavía no existe `node_modules`, levanta Vite y abre el navegador automáticamente. Para detener la app, cierra la ventana de la consola o presiona `Ctrl+C`.
+
+Para una prueba sin abrir el navegador:
+
+```bat
+iniciar.bat --no-open
+```
+
 ## Tecnologías y arquitectura
 
 - React 18, Vite y TypeScript en modo estricto.
