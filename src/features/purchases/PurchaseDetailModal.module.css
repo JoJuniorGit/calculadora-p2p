@@ -1,0 +1,196 @@
+.content {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.recordHeader {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.recordIdentity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.recordIdentity h3 {
+  min-width: 0;
+  margin: 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.headerMeta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.headerMeta > div {
+  display: grid;
+  align-content: start;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.headerMeta dt,
+.detailItem dt {
+  color: var(--text-muted);
+  font-size: 0.81rem;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+}
+
+.headerMeta dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.headerHint,
+.mutedText {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.detailSection {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-top: 0.15rem;
+}
+
+.sectionTitle,
+.historyTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.6rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.detailItem {
+  display: grid;
+  align-content: start;
+  gap: 0.22rem;
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.detailItem dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.noteField,
+.transitionControls,
+.closeForm {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.sectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.successNotice,
+.errorNotice {
+  min-width: 0;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.successNotice {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.errorNotice {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.statusActions,
+.modalActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.historySection {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+
+.historyTitle {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.closeForm > .mutedText {
+  margin-bottom: 0.15rem;
+}
+
+@media (max-width: 520px) {
+  .headerMeta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .statusActions,
+  .modalActions {
+    justify-content: stretch;
+  }
+
+  .statusActions > button,
+  .modalActions > button {
+    flex: 1 1 130px;
+  }
+}
+
+@media (max-width: 380px) {
+  .headerMeta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

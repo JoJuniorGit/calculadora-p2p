@@ -94,8 +94,8 @@ reproducible from its snapshot even after profiles/rates change.
 | T2 | Zustand store with persist/schemaVersion/migrate + export/import JSON/CSV + tests | delegated worker | completed |
 | T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | completed |
 | T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | completed |
-| T5 | Records: KPIs, filters, table/cards, detail, status flow + completion modal, export/import UI, README | delegated worker | pending |
-| T6 | Integration wiring, full test/build, independent verification | direct inline + verify | pending |
+| T5 | Records: KPIs, filters, table/cards, detail, status flow + completion modal, export/import UI, README | delegated worker | completed |
+| T6 | Integration wiring, full test/build, independent verification | direct inline + verify | in progress |
 
 ## Acceptance criteria
 
@@ -141,4 +141,11 @@ reproducible from its snapshot even after profiles/rates change.
 - T4 completed: reactive dual-mode calculator (Bs.S invested / USD requested), profile
   fee toggles per calculation, highlighted Binance amount + break-even + min gap,
   traffic light and loss alert, responsive waterfall. Build and 48 tests green.
-- Next: T5 records/KPIs/detail/status flow + README.
+- T5 completed: records panel (KPIs, filters, desktop table + mobile cards), detail with
+  reproducible snapshot/execution/notes, audit timeline, status flow with dedicated
+  real-sale-rate closing modal, filtered JSON/CSV exchange, Spanish README.
+- T6 in progress: `CalculatorPanel` + `PurchasesPanel` wired into `App.tsx`; build
+  (101 modules) and 48 tests green. README integration note corrected by the parent.
+  Next: independent read-only verification.
+- Engram mirror pending: the memory backend currently returns "could not resolve an
+  authoritative OpenCode runtime session"; local task file is authoritative meanwhile.

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from './store/useAppStore';
 import { Button } from './components/ui/Button';
-import { Card } from './components/ui/Card';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { BankProfilesPanel } from './features/bankProfiles/BankProfilesPanel';
+import { CalculatorPanel } from './features/calculator/CalculatorPanel';
+import { PurchasesPanel } from './features/purchases/PurchasesPanel';
 import { RatesPanel } from './features/rates/RatesPanel';
 import { SettingsPanel } from './features/settings/SettingsPanel';
 import styles from './App.module.css';
@@ -81,20 +82,8 @@ export default function App() {
             </>
           )}
           {activeTab === 'profiles' && <BankProfilesPanel />}
-          {activeTab === 'calculator' && (
-            <section data-module-placeholder="calculator">
-              <Card title="Calculadora">
-                <p>Este módulo se integra en la siguiente entrega.</p>
-              </Card>
-            </section>
-          )}
-          {activeTab === 'records' && (
-            <section data-module-placeholder="records">
-              <Card title="Registros">
-                <p>Este módulo se integra en la siguiente entrega.</p>
-              </Card>
-            </section>
-          )}
+          {activeTab === 'calculator' && <CalculatorPanel />}
+          {activeTab === 'records' && <PurchasesPanel />}
         </div>
       </div>
 

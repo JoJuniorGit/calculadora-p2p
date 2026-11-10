@@ -1,0 +1,57 @@
+.timeline {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0 0 0 0.55rem;
+  list-style: none;
+}
+
+.entry {
+  position: relative;
+  min-width: 0;
+  padding: 0 0 1rem 1.1rem;
+  border-left: 1px solid var(--border-strong);
+}
+
+.entry:last-child {
+  padding-bottom: 0;
+  border-left-color: transparent;
+}
+
+.entry::before {
+  position: absolute;
+  top: 0.2rem;
+  left: -0.34rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 2px solid var(--bg-elevated);
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  content: '';
+}
+
+.timestamp {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.transition,
+.note {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.transition {
+  font-weight: 650;
+}
+
+.note {
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}
