@@ -59,7 +59,7 @@ Los indicadores contables se calculan sobre todos los registros, no sobre la lis
 
 - **Capital en tránsito:** costo total de operaciones pendientes, con divisas acreditadas o depositadas en Binance.
 - **Ganancia líquida acumulada:** utilidad ejecutada de operaciones completadas.
-- **ROI global ponderado:** suma de utilidades completadas dividida entre suma de sus costos, por 100.
+- **ROI global ponderado:** suma de utilidades completadas dividida entre la suma de sus costos, multiplicada por 100.
 - **Canceladas:** conteo informativo; no se incluyen en las sumas.
 
 La pantalla exporta los resultados filtrados en JSON o CSV. Los archivos incluyen `schemaVersion`; para importar CSV se acepta el formato exportado por esta aplicación. La configuración completa también se puede intercambiar como JSON.
@@ -91,7 +91,7 @@ La navegación del shell incluye las cuatro pestañas operativas: Tasas, Perfile
 
 ## Pruebas
 
-Las 48 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, además de exportación e importación JSON/CSV.
+Las 49 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, y un smoke test de render cliente del shell con datos demo.
 
 ## Aviso
 

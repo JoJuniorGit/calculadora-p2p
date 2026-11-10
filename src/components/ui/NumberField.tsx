@@ -66,7 +66,6 @@ export function NumberField({
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
           aria-valuenow={Number.isFinite(numericValue) ? numericValue : undefined}
-          aria-valuestep={stepValue}
         />
         {suffix && <span className={styles.suffix}>{suffix}</span>}
       </div>

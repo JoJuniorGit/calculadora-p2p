@@ -95,7 +95,7 @@ reproducible from its snapshot even after profiles/rates change.
 | T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | completed |
 | T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | completed |
 | T5 | Records: KPIs, filters, table/cards, detail, status flow + completion modal, export/import UI, README | delegated worker | completed |
-| T6 | Integration wiring, full test/build, independent verification | direct inline + verify | in progress |
+| T6 | Integration wiring, full test/build, independent verification | direct inline + verify | completed |
 
 ## Acceptance criteria
 
@@ -147,5 +147,12 @@ reproducible from its snapshot even after profiles/rates change.
 - T6 in progress: `CalculatorPanel` + `PurchasesPanel` wired into `App.tsx`; build
   (101 modules) and 48 tests green. README integration note corrected by the parent.
   Next: independent read-only verification.
+- T6 completed: full integration, live provider checks (DolarApi oficial 899,2705 /
+  paralelo 1077,96531, Binance 10 ads), dev server + `/binance-api` proxy verified,
+  client render smoke test added (shell + calculator + records with demo data),
+  invalid `aria-valuestep` removed. Final suite 49 tests green; build green.
+  The delegated independent verifier could not run (inference service overloaded), so
+  parent verification (code read-through + commands + live checks) stands as evidence.
 - Engram mirror pending: the memory backend currently returns "could not resolve an
-  authoritative OpenCode runtime session"; local task file is authoritative meanwhile.
+  authoritative OpenCode runtime session" / degraded readiness; the local task file is
+  authoritative meanwhile.
