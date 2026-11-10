@@ -331,7 +331,7 @@ export function CalculatorPanel() {
             </div>
             {exchangeGap && (
               <div className={styles.rateItem}>
-                <dt>Brecha actual</dt>
+                <dt>Brecha actual (vs BCV + 0,50%)</dt>
                 <dd>
                   {formatPct(exchangeGap.pct, 2)}
                   <span className={styles.rateDetail}>({formatRate(exchangeGap.absoluteBs)} Bs.S)</span>

@@ -188,21 +188,33 @@ export function RatesPanel() {
 
       <Card title="Brecha cambiaria" className={styles.gapCard}>
         {gap ? (
-          <div className={styles.gapContent}>
-            <div className={styles.gapValues}>
-              <div>
-                <span className={styles.metricLabel}>Brecha porcentual</span>
-                <strong className={styles.metricValue}>{formatPct(gap.pct, 2)}</strong>
+          <>
+            <div className={styles.gapContent}>
+              <div className={styles.gapValues}>
+                <div>
+                  <span className={styles.metricLabel}>Brecha porcentual</span>
+                  <strong className={styles.metricValue}>{formatPct(gap.pct, 2)}</strong>
+                </div>
+                <div>
+                  <span className={styles.metricLabel}>Brecha absoluta</span>
+                  <strong className={styles.metricValue}>{formatRate(gap.absoluteBs)} Bs.S</strong>
+                </div>
+                <div>
+                  <span className={styles.metricLabel}>BCV efectiva (con 0,50%)</span>
+                  <strong className={styles.metricValue}>
+                    {formatRate(gap.effectiveBcvRate)} Bs.S
+                  </strong>
+                </div>
               </div>
-              <div>
-                <span className={styles.metricLabel}>Brecha absoluta</span>
-                <strong className={styles.metricValue}>{formatRate(gap.absoluteBs)} Bs.S</strong>
-              </div>
+              {gap.abnormal && (
+                <Badge tone="warning">Brecha anormalmente alta</Badge>
+              )}
             </div>
-            {gap.abnormal && (
-              <Badge tone="warning">Brecha anormalmente alta</Badge>
-            )}
-          </div>
+            <p className={styles.gapHint}>
+              La brecha se calcula contra la tasa BCV ajustada con la comisión de
+              intervención (0,50%).
+            </p>
+          </>
         ) : (
           <p className={styles.gapHint}>
             Ingresa las tasas BCV y Binance para calcular la brecha cambiaria.

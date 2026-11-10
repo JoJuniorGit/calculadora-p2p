@@ -82,6 +82,10 @@ reproducible from its snapshot even after profiles/rates change.
 - `netProfit = round2(bsOut - totalCostBs)`; `roi = netProfit / totalCostBs * 100`.
 - `breakEvenRate = totalCostBs / USD_3`; `minGapPct = (breakEvenRate - BCV)/BCV * 100`.
 - Traffic light: green `roi > 3`, yellow `roi > 0`, red otherwise.
+- Exchange gap displays (%) and absolute gap measured against the effective BCV rate:
+  `effectiveBcv = BCV + BCV * 0.005`; `gapPct = (Binance - effectiveBcv) / effectiveBcv * 100`;
+  `absolute = Binance - effectiveBcv`. The minimum-gap metric (`minGapPct`) remains
+  derived from the break-even rate, which already includes every cost.
 - Abnormal gap warning constant: `gap >= 50%`.
 - Record snapshot stores every input/fee/base/toggle for reproducibility.
 
@@ -150,9 +154,14 @@ reproducible from its snapshot even after profiles/rates change.
 - T6 completed: full integration, live provider checks (DolarApi oficial 899,2705 /
   paralelo 1077,96531, Binance 10 ads), dev server + `/binance-api` proxy verified,
   client render smoke test added (shell + calculator + records with demo data),
-  invalid `aria-valuestep` removed. Final suite 49 tests green; build green.
+  invalid `aria-valuestep` removed. Final suite 50 tests green; build green.
   The delegated independent verifier could not run (inference service overloaded), so
   parent verification (code read-through + commands + live checks) stands as evidence.
 - Engram mirror pending: the memory backend currently returns "could not resolve an
   authoritative OpenCode runtime session" / degraded readiness; the local task file is
   authoritative meanwhile.
+- Change request applied (post-delivery): exchange gap now uses the effective BCV rate
+  (`BCV + 0.50%` intervention) as its baseline and returns `effectiveBcvRate`; rates
+  panel shows the adjusted base and formula hint, calculator label clarified. Tests
+  updated for the new baseline; `minGapPct` unchanged because break-even already
+  includes the intervention cost.

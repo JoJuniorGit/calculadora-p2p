@@ -37,6 +37,8 @@ La tasa oficial del BCV y la tasa paralela se consultan en DolarApi. En desarrol
 
 Las tasas también se pueden editar manualmente. Si una consulta falla por red, CORS o disponibilidad del proveedor, se conserva el valor actual. La aplicación puede usarse sin conexión con los datos locales; las actualizaciones automáticas de tasas requieren internet.
 
+La brecha cambiaria se calcula contra la tasa BCV efectiva, que suma la comisión fija de intervención del 0,50%: `BCV_efectiva = BCV + BCV × 0,005` y `brecha % = (Binance − BCV_efectiva) / BCV_efectiva × 100`. La brecha mínima requerida que muestra la calculadora sigue derivándose de la tasa de equilibrio del motor, que ya incorpora todos los costos.
+
 ## Modelo de cálculo
 
 El cálculo aplica una comisión fija de intervención de 0,50% y admite dos entradas: monto de Bs.S a invertir o monto de USD a solicitar. Cada etapa monetaria se redondea a dos decimales con `round2`; las tasas conservan su precisión de entrada.
@@ -91,7 +93,7 @@ La navegación del shell incluye las cuatro pestañas operativas: Tasas, Perfile
 
 ## Pruebas
 
-Las 49 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, y un smoke test de render cliente del shell con datos demo.
+Las 50 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, y un smoke test de render cliente del shell con datos demo.
 
 ## Aviso
 

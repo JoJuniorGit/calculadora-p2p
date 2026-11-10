@@ -248,13 +248,28 @@ describe('calculate', () => {
 });
 
 describe('getExchangeGap', () => {
-  it('returns the absolute and percentage gap and flags the abnormal threshold', () => {
-    expect(getExchangeGap(40, 46)).toEqual({ pct: 15, absoluteBs: 6, abnormal: false });
-    expect(getExchangeGap(40, 60)).toEqual({
-      pct: ABNORMAL_GAP_PCT,
-      absoluteBs: 20,
-      abnormal: true,
-    });
+  it('uses the effective BCV rate (BCV + 0.50% intervention) as the gap baseline', () => {
+    const gap = getExchangeGap(40, 46);
+
+    expect(gap.effectiveBcvRate).toBeCloseTo(40.2, 10);
+    expect(gap.absoluteBs).toBeCloseTo(5.8, 10);
+    expect(gap.pct).toBeCloseTo((5.8 / 40.2) * 100, 10);
+    expect(gap.abnormal).toBe(false);
+
+    const otherGap = getExchangeGap(100, 110);
+    expect(otherGap.effectiveBcvRate).toBeCloseTo(100.5, 10);
+    expect(otherGap.absoluteBs).toBeCloseTo(9.5, 10);
+    expect(otherGap.pct).toBeCloseTo((9.5 / 100.5) * 100, 10);
+  });
+
+  it('flags the abnormal threshold against the effective BCV rate', () => {
+    const abnormalGap = getExchangeGap(40, 61);
+    expect(abnormalGap.pct).toBeGreaterThanOrEqual(ABNORMAL_GAP_PCT);
+    expect(abnormalGap.abnormal).toBe(true);
+
+    const belowThreshold = getExchangeGap(40, 60);
+    expect(belowThreshold.pct).toBeLessThan(ABNORMAL_GAP_PCT);
+    expect(belowThreshold.abnormal).toBe(false);
   });
 
   it('rejects a non-positive or non-finite BCV rate', () => {

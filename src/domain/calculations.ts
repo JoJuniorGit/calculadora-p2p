@@ -10,26 +10,43 @@ export const PROFITABILITY_GREEN_MIN_PCT = 3;
 export const PROFITABILITY_YELLOW_MIN_PCT = 0;
 export const ABNORMAL_GAP_PCT = 50;
 
+export interface ExchangeGap {
+  /** Gap percentage measured against the effective BCV rate. */
+  pct: number;
+  /** Absolute gap in Bs.S over the effective BCV rate. */
+  absoluteBs: number;
+  /** BCV rate plus the fixed 0.50% intervention commission. */
+  effectiveBcvRate: number;
+  abnormal: boolean;
+}
+
 export function round2(value: number): number {
   if (!Number.isFinite(value)) return value;
   const sign = value < 0 ? -1 : 1;
   return sign * Number(`${Math.round(Number(`${Math.abs(value)}e2`))}e-2`);
 }
 
-export function getExchangeGap(
-  bcvRate: number,
-  binanceRate: number,
-): { pct: number; absoluteBs: number; abnormal: boolean } {
+/**
+ * Effective BCV purchase rate: the quoted BCV rate plus the fixed 0.50%
+ * intervention commission. Used as the baseline for the exchange gap.
+ */
+export function getEffectiveBcvRate(bcvRate: number): number {
   if (!Number.isFinite(bcvRate) || bcvRate <= 0) {
     throw new Error('La tasa BCV debe ser mayor que 0');
   }
 
-  const absoluteBs = binanceRate - bcvRate;
-  const pct = (absoluteBs / bcvRate) * 100;
+  return bcvRate + bcvRate * (INTERVENTION_PCT / 100);
+}
+
+export function getExchangeGap(bcvRate: number, binanceRate: number): ExchangeGap {
+  const effectiveBcvRate = getEffectiveBcvRate(bcvRate);
+  const absoluteBs = binanceRate - effectiveBcvRate;
+  const pct = (absoluteBs / effectiveBcvRate) * 100;
 
   return {
     pct,
     absoluteBs,
+    effectiveBcvRate,
     abnormal: pct >= ABNORMAL_GAP_PCT,
   };
 }
