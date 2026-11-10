@@ -89,8 +89,8 @@ reproducible from its snapshot even after profiles/rates change.
 
 | ID | Task | Route | Status |
 | --- | --- | --- | --- |
-| T0 | Scaffold revised: deps, proxy, CSS module base, shared types/utils, git init | direct inline | in progress |
-| T1 | Domain: engine + round2 + waterfall + break-even, Zod schemas, status machine, KPIs + Vitest | delegated worker | pending |
+| T0 | Scaffold revised: deps, proxy, CSS module base, shared types/utils, git init | direct inline | completed |
+| T1 | Domain: engine + round2 + waterfall + break-even, Zod schemas, status machine, KPIs + Vitest | delegated worker | completed |
 | T2 | Zustand store with persist/schemaVersion/migrate + export/import JSON/CSV + tests | delegated worker | pending |
 | T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | pending |
 | T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | pending |
@@ -126,4 +126,8 @@ reproducible from its snapshot even after profiles/rates change.
 ## Progress log
 
 - Spec revised by the user (persist middleware, CSS Modules, proxy, dual engine, KPIs).
-- T0 in progress: existing scaffold from the first draft is being reconciled.
+- T0 completed: scaffold committed as `d948702` (build green, 159 packages installed,
+  RDD switch is off globally, so ordinary verification applies).
+- T1 completed: TDD RED (4 missing suites) → GREEN (34 tests / 4 files), build verified.
+  Files: calculations, validation, purchases, kpis. Parent spot-check confirmed fee
+  bases, break-even precision, KPI aggregation.

@@ -1,0 +1,142 @@
+import { describe, expect, it } from 'vitest';
+import type { CalculationSnapshot, PurchaseRecord, PurchaseStatus } from './types';
+import {
+  calculateExecution,
+  canTransition,
+  getNextStatuses,
+  PURCHASE_STATUS_LABELS,
+  PURCHASE_STATUS_ORDER,
+} from './purchases';
+
+const snapshot: CalculationSnapshot = {
+  profileId: 'profile-1',
+  profileName: 'Banco de prueba',
+  mode: 'bs',
+  inputAmount: 10_000,
+  amountBs: 10_000,
+  bcvRate: 40,
+  binanceRate: 46,
+  interventionPct: 0.5,
+  interventionFeeBs: 50,
+  netForPurchaseBs: 9_950,
+  cardCommissionPct: 2,
+  cardCommissionBase: 'usd',
+  cardCommissionUsd: 4.98,
+  cardCommissionBs: 199.2,
+  binanceDepositPct: 1,
+  binanceDepositFixedUsd: 0.5,
+  binanceDepositUsd: 2.94,
+  interbankEnabled: false,
+  interbankPct: 0.3,
+  interbankBase: 'initial',
+  interbankCostBs: 0,
+  igtfEnabled: false,
+  igtfPct: 3,
+  igtfBase: 'card',
+  igtfCostBs: 0,
+  slippageEnabled: false,
+  slippagePct: 2,
+};
+
+function createPurchase(overrides: Partial<PurchaseRecord> = {}): PurchaseRecord {
+  return {
+    id: 'purchase-1',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    profileId: snapshot.profileId,
+    profileName: snapshot.profileName,
+    mode: 'bs',
+    inputAmount: 10_000,
+    amountBs: 10_000,
+    bcvRate: 40,
+    binanceRate: 46,
+    snapshot,
+    usdBought: 248.75,
+    usdForBinance: 243.77,
+    usdDeposited: 240.83,
+    totalCostBs: 10_000,
+    estimatedBsOut: 11_078.18,
+    estimatedProfitBs: 1_078.18,
+    estimatedRoiPct: 10.7818,
+    breakEvenRate: 10_000 / 240.83,
+    status: 'pending',
+    statusHistory: [],
+    execution: null,
+    notes: '',
+    ...overrides,
+  };
+}
+
+describe('purchase status machine', () => {
+  it('exposes status order, Spanish labels, and sequential next statuses', () => {
+    expect(PURCHASE_STATUS_ORDER).toEqual([
+      'pending',
+      'usd_credited',
+      'deposited_binance',
+      'completed',
+      'cancelled',
+    ] satisfies PurchaseStatus[]);
+    expect(PURCHASE_STATUS_LABELS).toEqual({
+      pending: 'Pendiente',
+      usd_credited: 'Divisas acreditadas',
+      deposited_binance: 'Depositado a Binance',
+      completed: 'Vendido/Completado',
+      cancelled: 'Cancelado',
+    });
+    expect(getNextStatuses('pending')).toEqual(['usd_credited', 'cancelled']);
+    expect(getNextStatuses('usd_credited')).toEqual(['deposited_binance', 'cancelled']);
+    expect(getNextStatuses('deposited_binance')).toEqual(['completed', 'cancelled']);
+    expect(getNextStatuses('completed')).toEqual([]);
+    expect(getNextStatuses('cancelled')).toEqual([]);
+  });
+
+  it('allows only sequential progress and cancellation before completion', () => {
+    expect(canTransition('pending', 'usd_credited')).toBe(true);
+    expect(canTransition('usd_credited', 'deposited_binance')).toBe(true);
+    expect(canTransition('deposited_binance', 'completed')).toBe(true);
+    expect(canTransition('pending', 'deposited_binance')).toBe(false);
+    expect(canTransition('usd_credited', 'completed')).toBe(false);
+    expect(canTransition('pending', 'cancelled')).toBe(true);
+    expect(canTransition('usd_credited', 'cancelled')).toBe(true);
+    expect(canTransition('deposited_binance', 'cancelled')).toBe(true);
+    expect(canTransition('completed', 'cancelled')).toBe(false);
+    expect(canTransition('cancelled', 'pending')).toBe(false);
+  });
+});
+
+describe('calculateExecution', () => {
+  it('calculates actual proceeds, profit, and ROI above and below the estimate', () => {
+    const purchase = createPurchase();
+    const original = { ...purchase };
+    const higher = calculateExecution(purchase, 48);
+    const lower = calculateExecution(purchase, 44);
+
+    expect(higher).toMatchObject({
+      realBinanceRate: 48,
+      executedBsOut: 11_559.84,
+      executedProfitBs: 1_559.84,
+    });
+    expect(lower).toMatchObject({
+      realBinanceRate: 44,
+      executedBsOut: 10_596.52,
+      executedProfitBs: 596.52,
+    });
+    expect(higher.executedRoiPct).toBeCloseTo(15.5984, 12);
+    expect(lower.executedRoiPct).toBeCloseTo(5.9652, 12);
+    expect(Date.parse(higher.closedAt)).not.toBeNaN();
+    expect(purchase).toEqual(original);
+  });
+
+  it('rejects a non-positive or non-finite real sale rate', () => {
+    const purchase = createPurchase();
+
+    expect(() => calculateExecution(purchase, 0)).toThrow(
+      'La tasa real de venta debe ser mayor que 0',
+    );
+    expect(() => calculateExecution(purchase, Number.POSITIVE_INFINITY)).toThrow(
+      'La tasa real de venta debe ser mayor que 0',
+    );
+    expect(() => calculateExecution(purchase, Number.NaN)).toThrow(
+      'La tasa real de venta debe ser mayor que 0',
+    );
+  });
+});
