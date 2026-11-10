@@ -66,9 +66,11 @@ reproducible from its snapshot even after profiles/rates change.
   `I = round2(I_net / 0.995)`; forward pipeline recomputes `I_net`, so USD_1 may differ
   from the target by at most a cent from rounding.
 - `C_int = round2(I * 0.005)`; `I_net = round2(I - C_int)`; `USD_1 = round2(I_net / BCV)`.
-- Card (base `usd`): `cardUsd = round2(pct% * USD_1)`, deducted -> `USD_2`.
-  Card (base `ves`): `cardBs = round2(pct% * I_net)`, charged extra in Bs; does not
-  reduce `USD_2`; `cardUsd = round2(cardBs / BCV)` for display.
+- Card (base `usd`): gross-up so the fee is charged over the amount that actually
+  reaches Binance: `usdForBinance = round2(USD_1 / (1 + pct/100))`;
+  `cardUsd = round2(USD_1 - usdForBinance)` (retained fee). Base `ves`:
+  `cardBs = round2(pct% * I_net)`, charged extra in Bs; does not reduce `USD_2`;
+  `cardUsd = round2(cardBs / BCV)` for display.
 - `USD_2 = round2(USD_1 - cardUsd)` (usd base) or `USD_2 = USD_1` (ves base).
 - Binance: `feeUsd = round2(pct% * USD_2 + fixedUsd)`; `USD_3 = round2(USD_2 - feeUsd)`.
   Engine throws if `USD_3 <= 0`.
@@ -173,3 +175,8 @@ reproducible from its snapshot even after profiles/rates change.
   instead of `BUY`. Provider label clarifies "venta". Added `ratesApi.test.ts` asserting
   the request body uses `tradeType: 'SELL'`; live endpoint returned 10 SELL ads. Suite
   now 51 tests green.
+- Change request applied (post-delivery): USD-based card commission now uses a gross-up
+  (`usdForBinance = USD_1 / (1 + pct/100)`, fee = difference) instead of charging the
+  percentage on `USD_1`. Canonical expected values, IGTF-card, slippage and waterfall
+  tests updated; a dedicated 300 USD gross-up case added. Profile form hint documents
+  the formula. Suite now 52 tests green.

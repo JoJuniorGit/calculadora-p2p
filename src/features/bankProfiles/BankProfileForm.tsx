@@ -174,6 +174,11 @@ export function BankProfileForm({ profile, onSave, onCancel }: BankProfileFormPr
             error={fieldErrors.cardCommissionPct}
             suffix="%"
             step={0.01}
+            hint={
+              values.cardCommissionBase === 'usd'
+                ? 'El monto a depositar en Binance se calcula como USD acreditados / (1 + comisión/100).'
+                : 'La comisión se cobra extra en Bs.S y no reduce los USD acreditados.'
+            }
           />
           <SelectField
             label="Base de la comisión"

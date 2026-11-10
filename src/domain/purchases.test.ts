@@ -21,8 +21,8 @@ const snapshot: CalculationSnapshot = {
   netForPurchaseBs: 9_950,
   cardCommissionPct: 2,
   cardCommissionBase: 'usd',
-  cardCommissionUsd: 4.98,
-  cardCommissionBs: 199.2,
+  cardCommissionUsd: 4.88,
+  cardCommissionBs: 195.2,
   binanceDepositPct: 1,
   binanceDepositFixedUsd: 0.5,
   binanceDepositUsd: 2.94,
@@ -51,13 +51,13 @@ function createPurchase(overrides: Partial<PurchaseRecord> = {}): PurchaseRecord
     binanceRate: 46,
     snapshot,
     usdBought: 248.75,
-    usdForBinance: 243.77,
-    usdDeposited: 240.83,
+    usdForBinance: 243.87,
+    usdDeposited: 240.93,
     totalCostBs: 10_000,
-    estimatedBsOut: 11_078.18,
-    estimatedProfitBs: 1_078.18,
-    estimatedRoiPct: 10.7818,
-    breakEvenRate: 10_000 / 240.83,
+    estimatedBsOut: 11_082.78,
+    estimatedProfitBs: 1_082.78,
+    estimatedRoiPct: 10.8278,
+    breakEvenRate: 10_000 / 240.93,
     status: 'pending',
     statusHistory: [],
     execution: null,
@@ -112,16 +112,16 @@ describe('calculateExecution', () => {
 
     expect(higher).toMatchObject({
       realBinanceRate: 48,
-      executedBsOut: 11_559.84,
-      executedProfitBs: 1_559.84,
+      executedBsOut: 11_564.64,
+      executedProfitBs: 1_564.64,
     });
     expect(lower).toMatchObject({
       realBinanceRate: 44,
-      executedBsOut: 10_596.52,
-      executedProfitBs: 596.52,
+      executedBsOut: 10_600.92,
+      executedProfitBs: 600.92,
     });
-    expect(higher.executedRoiPct).toBeCloseTo(15.5984, 12);
-    expect(lower.executedRoiPct).toBeCloseTo(5.9652, 12);
+    expect(higher.executedRoiPct).toBeCloseTo(15.6464, 12);
+    expect(lower.executedRoiPct).toBeCloseTo(6.0092, 12);
     expect(Date.parse(higher.closedAt)).not.toBeNaN();
     expect(purchase).toEqual(original);
   });

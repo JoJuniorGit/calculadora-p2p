@@ -55,7 +55,7 @@ El cálculo aplica una comisión fija de intervención de 0,50% y admite dos ent
 
 | Concepto | Regla aplicada |
 | --- | --- |
-| Comisión de tarjeta | Porcentaje descontado de los USD o cobrado extra en Bs.S, según la base del perfil. |
+| Comisión de tarjeta | Base USD: el monto a Binance se calcula como `USD acreditados / (1 + comisión/100)` y la diferencia es la comisión retenida. Base Bs.S: se cobra extra y no reduce los USD. |
 | Depósito Binance | Porcentaje más un monto fijo en USD. |
 | Interbancario | Opcional; se calcula sobre la inversión inicial o sobre los Bs.S netos post-intervención. |
 | IGTF | Opcional; se calcula sobre el cargo de la tarjeta o sobre la inversión total en Bs.S. |
@@ -103,7 +103,7 @@ La navegación del shell incluye las cuatro pestañas operativas: Tasas, Perfile
 
 ## Pruebas
 
-Las 51 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta y un smoke test de render cliente del shell con datos demo.
+Las 52 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta y un smoke test de render cliente del shell con datos demo.
 
 ## Aviso
 

@@ -214,8 +214,11 @@ export function calculate(input: CalculationInput): CalculationResult {
   let cardCommissionBs: number;
   let usdForBinance: number;
   if (input.profile.cardCommissionBase === 'usd') {
-    cardCommissionUsd = round2(usdBought * (input.profile.cardCommissionPct / 100));
-    usdForBinance = round2(usdBought - cardCommissionUsd);
+    // Gross-up: the card fee is charged over the amount that actually reaches
+    // Binance, so the deposit is USD_1 / (1 + pct/100) and the retained fee is
+    // the difference. This matches bank cuts on the deposited amount.
+    usdForBinance = round2(usdBought / (1 + input.profile.cardCommissionPct / 100));
+    cardCommissionUsd = round2(usdBought - usdForBinance);
     cardCommissionBs = round2(cardCommissionUsd * input.bcvRate);
   } else {
     cardCommissionBs = round2(netForPurchaseBs * (input.profile.cardCommissionPct / 100));

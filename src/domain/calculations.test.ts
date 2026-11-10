@@ -68,23 +68,31 @@ describe('round2', () => {
 });
 
 describe('calculate', () => {
-  it('calculates the canonical USD-card case and rounds each monetary stage', () => {
+  it('grosses up the USD card fee and rounds each monetary stage', () => {
     const result = calculate(createInput());
 
     expect(result.amountBs).toBe(10_000);
     expect(result.interventionFeeBs).toBe(50);
     expect(result.netForPurchaseBs).toBe(9_950);
     expect(result.usdBought).toBe(248.75);
-    expect(result.cardCommissionUsd).toBe(4.98);
-    expect(result.usdForBinance).toBe(243.77);
+    expect(result.cardCommissionUsd).toBe(4.88);
+    expect(result.usdForBinance).toBe(243.87);
     expect(result.binanceFeeUsd).toBe(2.94);
-    expect(result.usdDeposited).toBe(240.83);
-    expect(result.bsOut).toBe(11_078.18);
+    expect(result.usdDeposited).toBe(240.93);
+    expect(result.bsOut).toBe(11_082.78);
     expect(result.totalCostBs).toBe(10_000);
-    expect(result.netProfitBs).toBe(1_078.18);
-    expect(result.roiPct).toBeCloseTo(10.7818, 8);
+    expect(result.netProfitBs).toBe(1_082.78);
+    expect(result.roiPct).toBeCloseTo(10.8278, 8);
     expect(result.profitability).toBe('green');
     expect(result.snapshot.interventionPct).toBe(INTERVENTION_PCT);
+  });
+
+  it('grosses up the Binance deposit from the requested bank USD', () => {
+    const result = calculate(createInput({ mode: 'usd', amount: 300 }));
+
+    expect(result.usdBought).toBe(300);
+    expect(result.usdForBinance).toBe(round2(300 / 1.02));
+    expect(result.cardCommissionUsd).toBe(round2(300 - round2(300 / 1.02)));
   });
 
   it('charges a VES-based card commission as extra Bs without reducing USD flow', () => {
@@ -118,8 +126,8 @@ describe('calculate', () => {
       }),
     );
 
-    expect(cardBase.igtfCostBs).toBe(5.98);
-    expect(cardBase.totalCostBs).toBe(10_005.98);
+    expect(cardBase.igtfCostBs).toBe(5.86);
+    expect(cardBase.totalCostBs).toBe(10_005.86);
     expect(investmentBase.igtfCostBs).toBe(300);
     expect(investmentBase.totalCostBs).toBe(10_300);
     expect(cardBase.roiPct).not.toBe(investmentBase.roiPct);
@@ -177,7 +185,7 @@ describe('calculate', () => {
 
     expect(withoutSlippage.binanceEffectiveRate).toBe(46);
     expect(withSlippage.binanceEffectiveRate).toBeCloseTo(45.08, 12);
-    expect(withSlippage.bsOut).toBe(10_856.62);
+    expect(withSlippage.bsOut).toBe(10_861.12);
     expect(withSlippage.bsOut).toBeLessThan(withoutSlippage.bsOut);
     expect(withSlippage.breakEvenRate).toBe(withoutSlippage.breakEvenRate);
     expect(withSlippage.breakEvenRate).toBe(
@@ -310,10 +318,10 @@ describe('calculation waterfall', () => {
     ]);
     expect(lines.get('intervention')?.amountBs).toBe(-50);
     expect(lines.get('intervention')?.label).toBe('Comisión por intervención (0,50%)');
-    expect(lines.get('card-commission')?.amountUsd).toBe(-4.98);
+    expect(lines.get('card-commission')?.amountUsd).toBe(-4.88);
     expect(lines.get('binance-deposit')?.amountUsd).toBe(-2.94);
     expect(lines.get('interbank')?.amountBs).toBe(-30);
-    expect(lines.get('igtf')?.amountBs).toBe(-5.98);
+    expect(lines.get('igtf')?.amountBs).toBe(-5.86);
     expect(lines.get('slippage')).toMatchObject({
       kind: 'info',
       detail: 'La tasa Binance efectiva ya incluye el deslizamiento',
