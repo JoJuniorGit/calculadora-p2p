@@ -1,0 +1,156 @@
+/* Global reset, design tokens and base element styling. */
+
+:root {
+  color-scheme: light;
+  --bg: #f4f6f9;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #eaeef4;
+  --bg-hover: #e2e8f0;
+  --text: #18202b;
+  --text-muted: #5a6779;
+  --border: #d4dce6;
+  --border-strong: #b3bfcd;
+  --primary: #0f62fe;
+  --primary-hover: #0046c7;
+  --primary-soft: #e3edff;
+  --primary-contrast: #ffffff;
+  --success: #15753c;
+  --success-soft: #e2f5e8;
+  --warning: #8a5600;
+  --warning-soft: #fff3d1;
+  --danger: #b3261e;
+  --danger-soft: #fdeceb;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.18);
+  --font:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #10151c;
+  --bg-elevated: #19212b;
+  --bg-subtle: #212b37;
+  --bg-hover: #2a3644;
+  --text: #e7edf5;
+  --text-muted: #9aa8b8;
+  --border: #2f3c4b;
+  --border-strong: #46566a;
+  --primary: #5c95ff;
+  --primary-hover: #7dacff;
+  --primary-soft: #1d2f4d;
+  --primary-contrast: #0b1524;
+  --success: #5cd08a;
+  --success-soft: #143524;
+  --warning: #f0be5c;
+  --warning-soft: #3a2d12;
+  --danger: #ff7b72;
+  --danger-soft: #3d1b1a;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.55);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 0.4em;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+p {
+  margin: 0 0 0.75em;
+}
+
+ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--primary);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.app-boot {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

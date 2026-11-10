@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+coverage
+.vite
+.DS_Store
+Thumbs.db

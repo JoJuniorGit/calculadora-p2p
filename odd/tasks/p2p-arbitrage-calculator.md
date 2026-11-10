@@ -1,0 +1,129 @@
+# Feature: P2P arbitrage calculator (USD/VES)
+
+## Objective
+
+Deliver a local-only React 18 + Vite + TypeScript (strict) web app that calculates and
+records USD arbitrage operations in bolívares: configurable BCV/Binance P2P rates,
+bank fee profiles, a pure calculation engine with a line-by-line waterfall, dual input
+mode (Bs.S invested or exact USD requested), break-even rate, purchase records with
+status audit trail, executed-profit closing, accounting KPIs, export/import and
+light/dark theme.
+
+## Problem / Why
+
+The user needs a reproducible way to evaluate and track Bs.S -> USD -> Bs.S operations.
+Profit simulation is error-prone by hand because fees stack in different bases and
+currencies. The calculation must be a pure, tested engine so every record is
+reproducible from its snapshot even after profiles/rates change.
+
+## Scope (revised spec, authoritative)
+
+- `zustand/persist` with mandatory `schemaVersion: 1` + `migrate` (no custom adapter).
+- Styles with CSS Modules (tokens in a small global stylesheet). No heavy UI libs.
+- `vite.config.ts` dev proxy to `https://p2p.binance.com` for Binance P2P.
+- Rates panel (BCV + Binance P2P): manual editing, optional auto-update. Dev: Binance
+  via proxy; production/fallback: `https://ve.dolarapi.com/v1/dolares` (oficial /
+  paralelo). Last-update timestamp + source badge. Graceful CORS/network failures.
+- Exchange gap (%) and absolute gap.
+- Bank profiles CRUD: card commission + base (USD deducted / extra Bs charged),
+  Binance deposit % + fixed USD, interbank toggle (default 0.30%, base initial or net),
+  IGTF toggle (default 3%, base card charge or total Bs investment), slippage toggle.
+- Fixed 0.50% intervention commission (not editable). No volume caps.
+- Pure engine `domain/calculations.ts` with internal `round2()` applied to monetary
+  stages, dual input mode, waterfall, traffic light (>3% green, >0% yellow, else red),
+  negative-profit alert, break-even rate and minimum required gap.
+- Purchase records: immutable snapshot (rates, fees, bases, toggles), USD bought /
+  USD for Binance / USD deposited, estimated Bs out/profit/ROI, statuses
+  pending -> usd_credited -> deposited_binance -> completed, cancelled from any point.
+- Completion modal asks real Binance sale rate (defaults to current) and stores executed
+  Bs out / executed profit / executed ROI.
+- Audit log per purchase (timestamp, from, to, note), visible in detail.
+- Accounting KPIs: capital in transit (pending..deposited) vs cumulative net profit
+  (completed only); cancelled excluded; weighted global ROI = sum profit / sum costs.
+- Records export/import JSON + CSV with `schemaVersion`; config export/import JSON.
+- Zod validation for user input and import schemas.
+- Editable/hideable legal disclaimer banner (disabled by default).
+- Tabs: Tasas, Perfiles, Calculadora, Registros. Responsive (table -> cards on mobile).
+- "Cargar datos demo": 1 bank profile + 1 completed record (+ demo rates).
+- Vitest mandatory for the engine: IEEE 754 rounding, Bs vs USD cost ROI difference,
+  break-even -> exactly 0 profit, negative profit, Bs input vs USD input modes.
+
+## Constraints
+
+- No backend, no auth, no SSR/Next/Nuxt/Angular/Electron. 100% browser.
+- Offline except optional rate auto-updates.
+- Engine pure, no React imports; UI copy in Spanish; English identifiers/comments.
+- Zustand for global state; Zod; CSS Modules; Vitest; no investment limits.
+- Never add AI attribution to commits.
+
+## Engine decisions (authoritative)
+
+- `round2(value)` symmetric: round half away from zero, 2 decimals, EPSILON-corrected.
+  Monetary stages are rounded to 2 decimals; rates keep input precision; break-even and
+  effective rates keep full precision (display rounds).
+- Input mode `bs`: `I = round2(amount)`.
+  Input mode `usd`: `USD_1_target = round2(amount)`; `I_net = round2(USD_1_target * BCV)`;
+  `I = round2(I_net / 0.995)`; forward pipeline recomputes `I_net`, so USD_1 may differ
+  from the target by at most a cent from rounding.
+- `C_int = round2(I * 0.005)`; `I_net = round2(I - C_int)`; `USD_1 = round2(I_net / BCV)`.
+- Card (base `usd`): `cardUsd = round2(pct% * USD_1)`, deducted -> `USD_2`.
+  Card (base `ves`): `cardBs = round2(pct% * I_net)`, charged extra in Bs; does not
+  reduce `USD_2`; `cardUsd = round2(cardBs / BCV)` for display.
+- `USD_2 = round2(USD_1 - cardUsd)` (usd base) or `USD_2 = USD_1` (ves base).
+- Binance: `feeUsd = round2(pct% * USD_2 + fixedUsd)`; `USD_3 = round2(USD_2 - feeUsd)`.
+  Engine throws if `USD_3 <= 0`.
+- Interbank (optional, Bs cost): base `initial` -> `round2(pct% * I)`;
+  base `net` -> `round2(pct% * I_net)`.
+- IGTF (optional, Bs cost): base `card` -> `round2(pct% * cardBs)` (card charge valued in
+  Bs); base `investment` -> `round2(pct% * I)`.
+- Slippage: `binanceEffective = binanceRate * (1 - slippagePct/100)`.
+- `bsOut = round2(USD_3 * binanceEffective)`.
+- `totalCostBs = round2(I + interbankCostBs + cardBsIfVesBase + igtfCostBs)`.
+- `netProfit = round2(bsOut - totalCostBs)`; `roi = netProfit / totalCostBs * 100`.
+- `breakEvenRate = totalCostBs / USD_3`; `minGapPct = (breakEvenRate - BCV)/BCV * 100`.
+- Traffic light: green `roi > 3`, yellow `roi > 0`, red otherwise.
+- Abnormal gap warning constant: `gap >= 50%`.
+- Record snapshot stores every input/fee/base/toggle for reproducibility.
+
+## Tasks
+
+| ID | Task | Route | Status |
+| --- | --- | --- | --- |
+| T0 | Scaffold revised: deps, proxy, CSS module base, shared types/utils, git init | direct inline | in progress |
+| T1 | Domain: engine + round2 + waterfall + break-even, Zod schemas, status machine, KPIs + Vitest | delegated worker | pending |
+| T2 | Zustand store with persist/schemaVersion/migrate + export/import JSON/CSV + tests | delegated worker | pending |
+| T3 | UI kit (CSS Modules) + app shell/theme + rates panel + bank profiles + settings/disclaimer | delegated worker | pending |
+| T4 | Calculator panel (dual mode, reactive waterfall, break-even highlight) | delegated worker | pending |
+| T5 | Records: KPIs, filters, table/cards, detail, status flow + completion modal, export/import UI, README | delegated worker | pending |
+| T6 | Integration wiring, full test/build, independent verification | direct inline + verify | pending |
+
+## Acceptance criteria
+
+- `npm install`, `npm run dev`, `npm run build`, `npm run test` all work.
+- Mandatory engine tests from the revised spec pass; validation/status/KPI tests pass.
+- Calculator output matches engine; break-even recompute yields 0 profit exactly.
+- Record snapshot reproduces the calculation after profile edits/deletion.
+- Completion requires a real Binance rate and stores executed profit vs estimated.
+- KPIs separate capital in transit (not completed/cancelled) from completed net profit;
+  weighted ROI = sum executed profit / sum completed costs.
+- Invalid imports rejected with clear messages and no state corruption.
+- Rate auto-update failures never block nor overwrite manual values.
+- Responsive layout + persisted light/dark theme + persisted schema version/migration.
+
+## Checks
+
+- `npm run test` (Vitest: domain, storage)
+- `npm run build` (tsc --noEmit + vite build)
+- Manual smoke: demo data, calculate both modes, record, advance status to completed with
+  real rate, export JSON/CSV, import, theme toggle, mobile layout.
+
+## Delivery strategy
+
+- `exception-ok` (documented): local standalone repository with no remote/PR target; the
+  user requested one complete runnable project. Work-unit commits on local `main`.
+- Forecast authored lines: ~3.5k (complete app requested; no artificial splitting).
+
+## Progress log
+
+- Spec revised by the user (persist middleware, CSS Modules, proxy, dual engine, KPIs).
+- T0 in progress: existing scaffold from the first draft is being reconciled.
