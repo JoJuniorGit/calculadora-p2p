@@ -85,7 +85,7 @@ async function fetchDolarApiRate(source: 'oficial' | 'paralelo'): Promise<Fetche
 }
 
 async function fetchBinanceProxyRate(): Promise<FetchedRate> {
-  const service = 'Binance P2P (proxy local)';
+  const service = 'Binance P2P venta (proxy local)';
 
   return withTimeout(service, async (signal) => {
     const response = await fetch('/binance-api/bapi/c2c/v2/friendly/c2c/adv/search', {
@@ -101,7 +101,9 @@ async function fetchBinanceProxyRate(): Promise<FetchedRate> {
         page: 1,
         rows: 10,
         payTypes: [],
-        tradeType: 'BUY',
+        // The app sells USD/USDT for Bs.S, so the relevant P2P side is SELL
+        // (buyer ads), not BUY (seller ads).
+        tradeType: 'SELL',
       }),
       signal,
     });

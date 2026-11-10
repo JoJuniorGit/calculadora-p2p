@@ -168,3 +168,8 @@ reproducible from its snapshot even after profiles/rates change.
 - Tooling addition: `iniciar.bat` performs a one-click Windows start (checks Node/npm,
   installs dependencies on first run, launches Vite and opens the browser). Verified
   with `iniciar.bat --no-open`: HTTP 200 and expected page title. README updated.
+- Change request applied (post-delivery): Binance P2P automatic rate now consumes the
+  `SELL` side (buyer ads), which is the relevant side when selling USD/USDT for Bs.S,
+  instead of `BUY`. Provider label clarifies "venta". Added `ratesApi.test.ts` asserting
+  the request body uses `tradeType: 'SELL'`; live endpoint returned 10 SELL ads. Suite
+  now 51 tests green.

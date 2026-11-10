@@ -43,7 +43,7 @@ iniciar.bat --no-open
 
 ## Tasas y uso sin conexión
 
-La tasa oficial del BCV y la tasa paralela se consultan en DolarApi. En desarrollo, Binance P2P se consulta a través del proxy `/binance-api`, que apunta a `https://p2p.binance.com`; si falla, se intenta DolarApi paralelo. En producción se usa DolarApi paralelo como alternativa para Binance.
+La tasa oficial del BCV y la tasa paralela se consultan en DolarApi. La tasa de Binance P2P se toma del lado de venta (`SELL`), que es el precio al que se pueden vender los USD/USDT. En desarrollo se consulta a través del proxy `/binance-api`, que apunta a `https://p2p.binance.com`; si falla, se intenta DolarApi paralelo como referencia. En producción se usa DolarApi paralelo como alternativa para Binance.
 
 Las tasas también se pueden editar manualmente. Si una consulta falla por red, CORS o disponibilidad del proveedor, se conserva el valor actual. La aplicación puede usarse sin conexión con los datos locales; las actualizaciones automáticas de tasas requieren internet.
 
@@ -103,7 +103,7 @@ La navegación del shell incluye las cuatro pestañas operativas: Tasas, Perfile
 
 ## Pruebas
 
-Las 50 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, y un smoke test de render cliente del shell con datos demo.
+Las 51 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta y un smoke test de render cliente del shell con datos demo.
 
 ## Aviso
 
