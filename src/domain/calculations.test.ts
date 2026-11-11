@@ -125,6 +125,23 @@ describe('calculate base and bank fees', () => {
     expect(result.snapshot.interventionPct).toBe(INTERVENTION_PCT);
   });
 
+  it('anchors Bs.S totals to the entered amount when cents are not representable', () => {
+    const result = calculate(
+      createInput({
+        mode: 'bs',
+        amount: 1_234.56,
+        profile: createProfile({
+          cardCommissionBase: 'ves',
+          igtfEnabled: true,
+        }),
+        options: createOptions({ igtfEnabled: true }),
+      }),
+    );
+
+    expect(result.amountBs).toBe(1_234.56);
+    expect(result.totalCostBs).toBe(1_234.56);
+  });
+
   it('applies the interbank cost over Base_Bs or Base_Bs + intervention', () => {
     const initialBase = calculate(
       createInput({

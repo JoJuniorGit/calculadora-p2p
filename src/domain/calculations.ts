@@ -575,6 +575,40 @@ export function calculate(input: CalculationInput): CalculationResult {
       : solveBaseForTotal(round2(input.amount), context);
   const downstream = calculateDownstream(base, context);
 
+  if (input.mode === 'bs') {
+    // The entered Bs.S amount is the total real disbursement. If cent rounding
+    // makes that exact total unreachable, keep the closest fee breakdown but
+    // anchor the total (and every derived metric) to the entered amount.
+    const targetTotal = round2(input.amount);
+    if (downstream.amountBs !== targetTotal) {
+      const netProfitBs = round2(downstream.bsOut - targetTotal);
+      const roiPct = targetTotal > 0 ? (netProfitBs / targetTotal) * 100 : 0;
+      const slippageFraction = input.options.slippageEnabled
+        ? input.profile.slippagePct / 100
+        : 0;
+      const effectiveBuyRate =
+        downstream.usdtNet > 0
+          ? targetTotal / downstream.usdtNet / (1 - slippageFraction)
+          : 0;
+      downstream.amountBs = targetTotal;
+      downstream.totalCostBs = targetTotal;
+      downstream.netProfitBs = netProfitBs;
+      downstream.roiPct = roiPct;
+      downstream.effectiveBuyRate = effectiveBuyRate;
+      downstream.breakEvenRate = effectiveBuyRate;
+      downstream.minGapPct =
+        input.bcvRate > 0
+          ? ((effectiveBuyRate - input.bcvRate) / input.bcvRate) * 100
+          : 0;
+      downstream.profitability =
+        roiPct > PROFITABILITY_GREEN_MIN_PCT
+          ? 'green'
+          : roiPct > PROFITABILITY_YELLOW_MIN_PCT
+            ? 'yellow'
+            : 'red';
+    }
+  }
+
   const snapshot: CalculationSnapshot = {
     profileId: input.profile.id,
     profileName: input.profile.name,
