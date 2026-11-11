@@ -18,6 +18,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { InfoTooltip } from '../../components/ui/InfoTooltip';
 import { SelectField } from '../../components/ui/SelectField';
 import { PurchaseDetailModal } from './PurchaseDetailModal';
+import { PurchaseRowActions } from './PurchaseRowActions';
 import { filterPurchases } from './purchaseFilters';
 import { StatusBadge } from './StatusBadge';
 import styles from './PurchasesPanel.module.css';
@@ -80,6 +81,7 @@ export function PurchasesPanel() {
 
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const [dataNotice, setDataNotice] = useState<DataNotice | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -182,43 +184,6 @@ export function PurchasesPanel() {
         message: `No se pudo avanzar el estado de la compra. ${detail}`,
       });
     }
-  };
-
-  const renderActions = (purchase: PurchaseRecord, mobile = false) => {
-    const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled');
-
-    return (
-      <div className={mobile ? styles.mobileActions : styles.tableActions}>
-        <Button
-          variant="secondary"
-          className={styles.actionButton}
-          onClick={() => setSelectedPurchaseId(purchase.id)}
-        >
-          Ver detalle
-        </Button>
-        {nextStatus && (
-          <Button
-            variant="secondary"
-            className={`${styles.actionButton} ${styles.advanceButton}`}
-            title={
-              nextStatus === 'completed'
-                ? 'Abre el detalle para registrar la tasa real de venta antes de completar la operación.'
-                : `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]}`
-            }
-            onClick={() => handleQuickAdvance(purchase, nextStatus)}
-          >
-            Avanzar estado
-          </Button>
-        )}
-        <Button
-          variant="dangerGhost"
-          className={styles.actionButton}
-          onClick={() => setDeleteTargetId(purchase.id)}
-        >
-          Eliminar
-        </Button>
-      </div>
-    );
   };
 
   const statusFilterValue: PurchaseFilters['status'] = filters.status;
@@ -354,12 +319,13 @@ export function PurchasesPanel() {
                     <th scope="col" className={styles.numericHeader}>Utilidad</th>
                     <th scope="col" className={styles.numericHeader}>ROI</th>
                     <th scope="col">Estado</th>
-                    <th scope="col">Acciones</th>
+                    <th scope="col" className={styles.actionsCell}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPurchases.map((purchase) => {
                     const outcome = getPurchaseOutcome(purchase);
+                    const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled') ?? null;
                     return (
                       <tr key={purchase.id}>
                         <td>{formatDate(purchase.createdAt)}</td>
@@ -372,7 +338,19 @@ export function PurchasesPanel() {
                         </td>
                         <td className={styles.numericCell}>{formatPct(outcome.roiPct)}</td>
                         <td><StatusBadge status={purchase.status} /></td>
-                        <td>{renderActions(purchase)}</td>
+                        <td className={styles.actionsCell}>
+                          <PurchaseRowActions
+                            purchaseLabel={`${purchase.profileName}, ${formatDate(purchase.createdAt)}`}
+                            nextStatus={nextStatus}
+                            open={openActionsId === purchase.id}
+                            onOpenChange={(open) => setOpenActionsId(open ? purchase.id : null)}
+                            onViewDetail={() => setSelectedPurchaseId(purchase.id)}
+                            onAdvance={() => {
+                              if (nextStatus) handleQuickAdvance(purchase, nextStatus);
+                            }}
+                            onDelete={() => setDeleteTargetId(purchase.id)}
+                          />
+                        </td>
                       </tr>
                     );
                   })}
@@ -383,6 +361,7 @@ export function PurchasesPanel() {
             <div className={styles.mobileList} aria-label="Registros de compras">
               {filteredPurchases.map((purchase) => {
                 const outcome = getPurchaseOutcome(purchase);
+                const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled') ?? null;
                 return (
                   <article className={styles.mobileCard} key={purchase.id}>
                     <header className={styles.mobileCardHeader}>
@@ -390,7 +369,20 @@ export function PurchasesPanel() {
                         <h3>{purchase.profileName}</h3>
                         <time dateTime={purchase.createdAt}>{formatDate(purchase.createdAt)}</time>
                       </div>
-                      <StatusBadge status={purchase.status} />
+                      <div className={styles.mobileStatusActions}>
+                        <StatusBadge status={purchase.status} />
+                        <PurchaseRowActions
+                          purchaseLabel={`${purchase.profileName}, ${formatDate(purchase.createdAt)}`}
+                          nextStatus={nextStatus}
+                          open={openActionsId === purchase.id}
+                          onOpenChange={(open) => setOpenActionsId(open ? purchase.id : null)}
+                          onViewDetail={() => setSelectedPurchaseId(purchase.id)}
+                          onAdvance={() => {
+                            if (nextStatus) handleQuickAdvance(purchase, nextStatus);
+                          }}
+                          onDelete={() => setDeleteTargetId(purchase.id)}
+                        />
+                      </div>
                     </header>
                     <dl className={styles.mobileDetails}>
                       <div><dt>Invertido</dt><dd>{formatBs(purchase.amountBs)}</dd></div>
@@ -404,7 +396,6 @@ export function PurchasesPanel() {
                       </div>
                       <div><dt>ROI</dt><dd>{formatPct(outcome.roiPct)}</dd></div>
                     </dl>
-                    {renderActions(purchase, true)}
                   </article>
                 );
               })}

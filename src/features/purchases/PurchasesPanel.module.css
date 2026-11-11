@@ -217,31 +217,9 @@
   color: var(--danger);
 }
 
-.tableActions,
-.mobileActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  min-width: 0;
-}
-
-.tableActions > .actionButton,
-.mobileActions > .actionButton {
-  min-height: 34px;
-  padding: 0.38rem 0.5rem;
-  font-size: 0.78rem;
-}
-
-.tableActions > .advanceButton,
-.mobileActions > .advanceButton {
-  color: var(--primary);
-}
-
-.tableActions > .advanceButton:hover:not(:disabled),
-.mobileActions > .advanceButton:hover:not(:disabled) {
-  border-color: var(--primary-glow);
-  background: var(--primary-soft);
-  color: var(--primary);
+.recordsTable th.actionsCell,
+.recordsTable td.actionsCell {
+  text-align: right;
 }
 
 .mobileList {
@@ -317,10 +295,14 @@
   overflow-wrap: anywhere;
 }
 
-.mobileActions {
+.mobileStatusActions {
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--border);
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-self: flex-end;
 }
 
 .dataActions {
@@ -405,9 +387,5 @@
 
   .mobileCardHeader {
     flex-direction: column;
-  }
-
-  .mobileActions > button {
-    flex: 1 1 120px;
   }
 }

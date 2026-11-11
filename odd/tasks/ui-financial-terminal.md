@@ -64,11 +64,17 @@ Status: completed.
 
 ## Verification log
 
-- `npm run test`: 52/52 green after U1, U2 and integration refinements.
-- `npm run build`: green (107 modules after U1/U2).
-- Headless Chrome visual smoke at 1440x2200 (light + dark): rates empty/filled, records/KPIs, calculator zero and filled, profiles, settings switch/accordion, KPI tooltip, `Alt` shortcuts, demo data.
+- `npm run test`: 52/52 green after U1/U2; 51/51 after removing the demo store test.
+- `npm run build`: green (109 modules after the records action menu).
+- Headless Chrome visual smoke at 1440x2200 (light + dark): rates empty/filled, records/KPIs, calculator zero and filled, profiles, settings switch/accordion, KPI tooltip, `Alt` shortcuts, demo data (before removal).
 - Functional smoke: registered a 10,000 Bs purchase, advanced it from Pendiente to Divisas acreditadas via the row quick action; the next action remained available.
-- Protected files untouched: `src/domain/calculations.ts`, all `*.test.ts(x)`, `src/store/useAppStore.ts`.
+- Protected files untouched: `src/domain/calculations.ts`, all `*.test.ts(x)` (the demo-dependent test was updated/removed by explicit product request), `src/store/useAppStore.ts` (demo action removed by explicit product request).
+
+## Post-delivery requests
+
+- Demo data loading removed: App button/dialog, store `loadDemoData` and demo helpers, demo store test. README no longer advertises it. The App smoke test now asserts the empty state. Existing records already present in a user's localStorage are not deleted automatically.
+- Theme toggle replaced with an accessible icon-only sun/moon button.
+- Records row/card actions replaced with a single kebab icon that opens a portal menu (`Ver detalle`, `Avanzar estado` when applicable, `Eliminar`). The menu is viewport-clamped, closes on outside click/Escape/scroll/resize, supports keyboard focus, and routes completion through the detail modal for the real sale rate. Verified with headless Chrome on desktop and via a programmatic advance.
 
 ## Delivery strategy
 
