@@ -54,4 +54,4 @@ Delegated direct is unnecessary: bounded UI refactor, files already mapped, sing
 
 ## Commit log
 
-- Pending.
+- `583d078` feat(records): polish financial table for accounting readability.
