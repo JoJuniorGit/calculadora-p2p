@@ -101,7 +101,7 @@ La navegación del shell incluye cuatro pestañas operativas en este orden: Calc
 
 ## Pruebas
 
-Las 54 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta, la tabla financiera y las acciones de Registros, y un smoke test de render cliente del shell con estado vacío.
+Las 55 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta, la tabla financiera y las acciones de Registros, la prioridad del perfil en la calculadora, y un smoke test de render cliente del shell con estado vacío.
 
 ## Aviso
 

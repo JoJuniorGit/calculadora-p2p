@@ -180,4 +180,4 @@ reproducible from its snapshot even after profiles/rates change.
   percentage on `USD_1`. Canonical expected values, IGTF-card, slippage and waterfall
   tests updated; a dedicated 300 USD gross-up case added. Profile form hint documents
   the formula. Suite now 52 tests green.
-- Change request applied: demo data loading removed at user request (App button/dialog, store `loadDemoData` and demo helpers, demo store test). App smoke test now asserts the empty state; suite 54 tests including the financial table/action tests.
+- Change request applied: demo data loading removed at user request (App button/dialog, store `loadDemoData` and demo helpers, demo store test). App smoke test now asserts the empty state; suite 55 tests including the financial table/action and calculator profile-priority tests.

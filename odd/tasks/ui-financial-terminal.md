@@ -64,7 +64,7 @@ Status: completed.
 
 ## Verification log
 
-- `npm run test`: 52/52 green after U1/U2; 51/51 after removing the demo store test; 54/54 after the financial table/actions tests.
+- `npm run test`: 52/52 green after U1/U2; 51/51 after removing the demo store test; 55/55 after the financial table/actions and calculator profile-priority tests.
 - `npm run build`: green (109 modules after the records action menu).
 - Headless Chrome visual smoke at 1440x2200 (light + dark): rates empty/filled, records/KPIs, calculator zero and filled, profiles, settings switch/accordion, KPI tooltip, `Alt` shortcuts, demo data (before removal).
 - Functional smoke: registered a 10,000 Bs purchase, advanced it from Pendiente to Divisas acreditadas via the row quick action; the next action remained available.
