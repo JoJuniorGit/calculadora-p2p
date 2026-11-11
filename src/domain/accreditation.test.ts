@@ -121,10 +121,10 @@ describe('recalculateAccreditation', () => {
     expect(result.accreditationRatePercent).toBeCloseTo(50, 2);
     expect(result.netForPurchaseBs).toBe(round2(accreditedUsd * purchase.snapshot.bcvRate));
     expect(result.amountBs).toBe(
-      round2(result.netForPurchaseBs / (1 - 0.005)),
+      round2(result.netForPurchaseBs + result.interventionFeeBs),
     );
     expect(result.interventionFeeBs).toBe(
-      round2(result.amountBs - result.netForPurchaseBs),
+      round2(result.netForPurchaseBs * 0.005),
     );
     expect(result.refundedVes).toBe(
       round2(purchase.requestedInvestmentVes - result.amountBs),

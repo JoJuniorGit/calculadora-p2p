@@ -36,6 +36,7 @@ const snapshot: CalculationSnapshot = {
   igtfCostBs: 0,
   slippageEnabled: false,
   slippagePct: 2,
+  usdtNet: 240.43,
 };
 
 function createPurchase(overrides: Partial<PurchaseRecord> = {}): PurchaseRecord {
@@ -120,16 +121,16 @@ describe('calculateExecution', () => {
 
     expect(higher).toMatchObject({
       realBinanceRate: 48,
-      executedBsOut: 11_564.64,
-      executedProfitBs: 1_564.64,
+      executedBsOut: 11_540.64,
+      executedProfitBs: 1_540.64,
     });
     expect(lower).toMatchObject({
       realBinanceRate: 44,
-      executedBsOut: 10_600.92,
-      executedProfitBs: 600.92,
+      executedBsOut: 10_578.92,
+      executedProfitBs: 578.92,
     });
-    expect(higher.executedRoiPct).toBeCloseTo(15.6464, 12);
-    expect(lower.executedRoiPct).toBeCloseTo(6.0092, 12);
+    expect(higher.executedRoiPct).toBeCloseTo(15.4064, 12);
+    expect(lower.executedRoiPct).toBeCloseTo(5.7892, 12);
     expect(Date.parse(higher.closedAt)).not.toBeNaN();
     expect(purchase).toEqual(original);
   });

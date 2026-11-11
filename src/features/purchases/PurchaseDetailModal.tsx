@@ -226,6 +226,9 @@ export function PurchaseDetailModal({
 
   const nextStatuses = getNextStatuses(purchase.status);
   const snapshot = purchase.snapshot;
+  const appliedBinanceFee = snapshot.binancePercentFeeUsd ?? snapshot.binanceDepositUsd;
+  const igtfUsd = snapshot.igtfCostUsd ?? 0;
+  const hasAuditedSnapshot = snapshot.usdtNet !== undefined;
   const lastAuditTimestamp = getLatestAuditTimestamp(purchase);
   const summaryItems: DetailItem[] = [
     { label: 'Invertido', value: formatBs(purchase.amountBs) },
@@ -294,15 +297,31 @@ export function PurchaseDetailModal({
     },
     {
       label: 'Depósito Binance',
-      value: `${formatPctWithFixedUsd(snapshot.binanceDepositPct, snapshot.binanceDepositFixedUsd, Number.isInteger(snapshot.binanceDepositPct) ? 0 : 2)} · comisión aplicada ${formatUsd(snapshot.binanceDepositUsd)}`,
+      value: `${formatPctWithFixedUsd(snapshot.binanceDepositPct, snapshot.binanceDepositFixedUsd, Number.isInteger(snapshot.binanceDepositPct) ? 0 : 2)} · comisión aplicada ${formatUsd(appliedBinanceFee)}`,
     },
+    ...(hasAuditedSnapshot && snapshot.binanceDepositFixedUsd > 0
+      ? [
+          {
+            label: 'Comisión fija P2P',
+            value: `${formatUsd(snapshot.binanceDepositFixedUsd)} · equivalente ${formatBs(snapshot.binanceFixedDiscountBs ?? 0)} a la tasa efectiva de venta`,
+          },
+        ]
+      : []),
+    ...(hasAuditedSnapshot
+      ? [
+          {
+            label: 'USDT netos para venta',
+            value: formatUsd(snapshot.usdtNet ?? 0),
+          },
+        ]
+      : []),
     {
       label: 'Interbancario',
       value: `${formatEnabled(snapshot.interbankEnabled)} · ${formatProfilePct(snapshot.interbankPct)} · ${getInterbankBaseLabel(purchase)} · cargo ${formatBs(snapshot.interbankCostBs)}`,
     },
     {
       label: 'IGTF',
-      value: `${formatEnabled(snapshot.igtfEnabled)} · ${formatProfilePct(snapshot.igtfPct)} · ${getIgtfBaseLabel(purchase)} · cargo ${formatBs(snapshot.igtfCostBs)}`,
+      value: `${formatEnabled(snapshot.igtfEnabled)} · ${formatProfilePct(snapshot.igtfPct)} · ${getIgtfBaseLabel(purchase)} · cargo ${igtfUsd > 0 ? formatUsd(igtfUsd) : formatBs(snapshot.igtfCostBs)}`,
     },
     {
       label: 'Slippage',

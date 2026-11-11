@@ -159,8 +159,8 @@ export function CalculatorPanel() {
     if (!selectedProfile || !ratesConfigured) return null;
 
     const input: CalculationInput = {
-      mode,
-      amount: mode === 'bs' ? 1000 : 100,
+      mode: 'usd',
+      amount: 100,
       bcvRate: rates.bcv.value,
       binanceRate: rates.binance.value,
       profile: selectedProfile,
@@ -173,7 +173,6 @@ export function CalculatorPanel() {
       return null;
     }
   }, [
-    mode,
     options,
     rates.bcv.value,
     rates.binance.value,
@@ -511,7 +510,7 @@ export function CalculatorPanel() {
                 title="Monto en Bs.S dedicado a la compra BCV + 0,50%."
               >
                 <span className={styles.metricLabel}>Inversión</span>
-                <strong className={styles.heroValue}>{formatBs(result?.amountBs ?? 0)}</strong>
+                <strong className={styles.heroValue}>{formatBs(result?.bcvPurchaseBs ?? 0)}</strong>
               </article>
               <article
                 className={`${styles.heroMetric} ${styles.secondaryMetric}`}
@@ -592,7 +591,7 @@ export function CalculatorPanel() {
               </article>
               <article className={styles.metricCard}>
                 <span className={styles.metricLabel}>USDT netos en billetera</span>
-                <strong className={styles.metricValue}>{formatUsd(result?.usdDeposited ?? 0)}</strong>
+                <strong className={styles.metricValue}>{formatUsd(result?.usdtNet ?? 0)}</strong>
               </article>
             </div>
 

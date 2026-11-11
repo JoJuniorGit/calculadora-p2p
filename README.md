@@ -51,19 +51,19 @@ La brecha cambiaria se calcula contra la tasa BCV efectiva, que suma la comisió
 
 ## Modelo de cálculo
 
-El cálculo aplica una comisión fija de intervención de 0,50% y admite dos entradas: monto de Bs.S a invertir o monto de USD a solicitar. Cada etapa monetaria se redondea a dos decimales con `round2`; las tasas conservan su precisión de entrada.
+El cálculo fija la intervención en 0,50% sobre la base en Bs.S del USD solicitado (`Base_Bs = USD_1 × BCV`), no sobre el total ingresado. El modo "Invertir Bs.S" resuelve `USD_1` inversamente a partir del costo total, para que ambos modos sean simétricos. Cada etapa monetaria se redondea a dos decimales con `round2`; las tasas conservan su precisión de entrada.
 
 | Concepto | Regla aplicada |
 | --- | --- |
 | Comisión de tarjeta | Base USD: el monto a Binance se calcula como `USD acreditados / (1 + comisión/100)` y la diferencia es la comisión retenida. Base Bs.S: se cobra extra y no reduce los USD. |
-| Depósito Binance | Porcentaje más un monto fijo en USD. |
-| Interbancario | Opcional; se calcula sobre la inversión inicial o sobre los Bs.S netos post-intervención. |
-| IGTF | Opcional; se calcula sobre el cargo de la tarjeta o sobre la inversión total en Bs.S. |
+| Depósito Binance | Porcentaje sobre `USD_2` que llega a la pasarela. El cargo fijo en USDT se descuenta al vender en P2P, valorado a la tasa efectiva de venta (nunca a BCV). |
+| Interbancario | Opcional; se calcula sobre `Base_Bs` (base inicial) o sobre `Base_Bs + intervención` (base neta). |
+| IGTF | Opcional; en USD cuando el cargo de tarjeta es en USD; en Bs.S cuando la tarjeta o la inversión es en Bs.S. |
 | Slippage | Opcional; ajusta la tasa Binance usada en la estimación. |
 
 Los costos de IGTF y slippage solo se muestran en la calculadora y en la tarjeta del perfil cuando están activos en la configuración del banco. El formulario de perfil siempre permite configurarlos.
 
-El motor calcula la tasa de equilibrio y la brecha mínima requerida. La señal de rentabilidad es verde para ROI mayor que 3%, amarilla para ROI mayor que 0% y roja para ROI menor o igual que 0%.
+El motor calcula la tasa de equilibrio y la brecha mínima requerida. La tasa de equilibrio depende solo del costo total y de los USDT netos después del cargo fijo P2P: `Costo_Total_Bs / (USD_3 − fijo)`, dividiendo además por `(1 − slippage/100)` cuando el slippage está activo; no depende de la tasa Binance de mercado. La señal de rentabilidad es verde para ROI mayor que 3%, amarilla para ROI mayor que 0% y roja para ROI menor o igual que 0%.
 
 ## Registros y auditoría
 
@@ -101,7 +101,7 @@ La navegación del shell incluye cuatro pestañas operativas en este orden: Calc
 
 ## Pruebas
 
-Las 55 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta, la tabla financiera y las acciones de Registros, la prioridad del perfil en la calculadora, y un smoke test de render cliente del shell con estado vacío.
+Las 73 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, la tarjeta inversa, el fijo P2P valorado a tasa efectiva, la independencia del break-even, validación Zod, transiciones y ejecución de compras, acreditaciones, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta, la tabla financiera y las acciones de Registros, la prioridad del perfil en la calculadora, y un smoke test de render cliente del shell con estado vacío.
 
 ## Aviso
 

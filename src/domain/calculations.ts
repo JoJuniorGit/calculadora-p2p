@@ -47,32 +47,58 @@ interface CalculationContext {
   options: CalculationOptions;
 }
 
-interface CalculationBase {
-  amountBs: number;
+/** Base stages: USD_1 and its Bs.S base at BCV. */
+interface BaseAmounts {
+  /** USD_1 × BCV. */
+  baseBs: number;
+  /** Base_Bs × 0.50%. */
   interventionFeeBs: number;
-  netForPurchaseBs: number;
+  /** Base_Bs + intervention; the Bs.S dedicated to the BCV purchase. */
+  bcvPurchaseBs: number;
+  /** USD credited at the bank (USD_1). */
   usdBought: number;
 }
 
 interface DownstreamAmounts {
+  /** Total Bs.S cost (Base_Bs + all Bs.S fees). */
+  amountBs: number;
+  /** Base_Bs (compatibility field). */
+  netForPurchaseBs: number;
   cardCommissionUsd: number;
   cardCommissionBs: number;
+  /** USD_2: USD that travels through the Binance gateway. */
   usdForBinance: number;
+  /** Percentage-only Binance deposit fee. */
+  binancePercentFeeUsd: number;
+  /** Fixed P2P fee in USDT. */
+  binanceFixedFeeUsd: number;
+  /** Fixed P2P fee valued at the effective sale rate, in Bs.S. */
+  binanceFixedDiscountBs: number;
+  /** Legacy total (percentage + fixed) for display compatibility. */
   binanceFeeUsd: number;
+  /** USD_3: USDT after the percentage fee and USD IGTF, before the fixed fee. */
   usdDeposited: number;
+  /** USDT available to sell after the fixed P2P fee. */
+  usdtNet: number;
   interbankCostBs: number;
   igtfCostBs: number;
+  igtfCostUsd: number;
   binanceEffectiveRate: number;
+  /** Gross P2P sale before the fixed P2P fee. */
+  grossSaleBs: number;
   bsOut: number;
   totalCostBs: number;
   netProfitBs: number;
   roiPct: number;
+  /** Minimum quoted Binance sale rate for zero profit. */
+  effectiveBuyRate: number;
+  /** Alias of effectiveBuyRate for existing consumers. */
   breakEvenRate: number;
   minGapPct: number;
   profitability: Profitability;
 }
 
-export interface AccreditationResult extends CalculationBase, DownstreamAmounts {
+export interface AccreditationResult extends BaseAmounts, DownstreamAmounts {
   accreditedUsd: number;
   accreditationType: AccreditationType;
   accreditationRatePercent: number;
@@ -80,23 +106,6 @@ export interface AccreditationResult extends CalculationBase, DownstreamAmounts 
   refundedVes: number;
   keepInterbankSunk: boolean;
   waterfall: WaterfallLine[];
-}
-
-interface WaterfallSource {
-  amountBs: number;
-  interventionFeeBs: number;
-  netForPurchaseBs: number;
-  usdBought: number;
-  cardCommissionUsd: number;
-  cardCommissionBs: number;
-  usdForBinance: number;
-  binanceFeeUsd: number;
-  usdDeposited: number;
-  interbankCostBs: number;
-  igtfCostBs: number;
-  bsOut: number;
-  totalCostBs: number;
-  netProfitBs: number;
 }
 
 export function round2(value: number): number {
@@ -142,18 +151,237 @@ function formatPctLabel(value: number): string {
   return `${formatNumberLabel(value)}%`;
 }
 
+function positiveModifier(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** Builds the base stages from a Bs.S base at BCV. */
+function baseFromBaseBs(baseBsInput: number, bcvRate: number): BaseAmounts {
+  const baseBs = round2(baseBsInput);
+  const interventionFeeBs = round2(baseBs * (INTERVENTION_PCT / 100));
+
+  return {
+    baseBs,
+    interventionFeeBs,
+    bcvPurchaseBs: round2(baseBs + interventionFeeBs),
+    usdBought: round2(baseBs / bcvRate),
+  };
+}
+
+/** Builds the base stages from the exact USD_1 requested from the bank. */
+function baseFromUsd(usdInput: number, bcvRate: number): BaseAmounts {
+  return baseFromBaseBs(round2(usdInput) * bcvRate, bcvRate);
+}
+
+/**
+ * Estimates the Bs.S base that produces a target total cost, ignoring cent
+ * rounding. The estimate is then adjusted over neighboring cents below.
+ */
+function estimateBaseForTotal(totalCost: number, context: CalculationContext): number {
+  const intervention = INTERVENTION_PCT / 100;
+  const interbank = context.options.interbankEnabled
+    ? context.profile.interbankPct / 100
+    : 0;
+  const cardVes =
+    context.profile.cardCommissionBase === 'ves'
+      ? context.profile.cardCommissionPct / 100
+      : 0;
+  const igtf = context.options.igtfEnabled
+    ? context.profile.igtfPct / 100
+    : 0;
+
+  const interbankCoefficient =
+    context.profile.interbankBase === 'initial'
+      ? interbank
+      : (1 + intervention) * interbank;
+
+  const igtfCoefficient =
+    context.options.igtfEnabled && context.profile.igtfBase === 'investment'
+      ? (1 + intervention + interbankCoefficient + cardVes) * igtf
+      : context.options.igtfEnabled && context.profile.igtfBase === 'card'
+        ? cardVes * igtf
+        : 0;
+
+  return totalCost / (1 + intervention + interbankCoefficient + cardVes + igtfCoefficient);
+}
+
+/**
+ * Solves Base_Bs so the rounded total Bs.S cost equals the requested amount.
+ * The search works in cents and picks the closest reachable total.
+ */
+function solveBaseForTotal(totalCost: number, context: CalculationContext): BaseAmounts {
+  const estimate = round2(estimateBaseForTotal(totalCost, context));
+  let best = baseFromBaseBs(estimate, context.bcvRate);
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let offset = -200; offset <= 200; offset += 1) {
+    const candidateBase = round2(estimate + offset * 0.01);
+    if (candidateBase <= 0) continue;
+
+    const candidate = baseFromBaseBs(candidateBase, context.bcvRate);
+    let candidateTotal: number;
+    try {
+      candidateTotal = calculateDownstream(candidate, context).amountBs;
+    } catch {
+      continue;
+    }
+
+    const distance = Math.abs(candidateTotal - totalCost);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+    if (distance === 0) break;
+  }
+
+  return best;
+}
+
+function calculateDownstream(
+  base: BaseAmounts,
+  context: CalculationContext,
+  sunkInterbankCostBs?: number,
+): DownstreamAmounts {
+  const { profile, options } = context;
+  const usd1 = base.baseBs / context.bcvRate;
+
+  let cardCommissionUsd: number;
+  let cardCommissionBs: number;
+  let usdForBinance: number;
+
+  if (profile.cardCommissionBase === 'usd') {
+    // Real inverse card fee: the bank retains its percentage over the amount
+    // that finally passes through the gateway.
+    usdForBinance = round2(usd1 / (1 + profile.cardCommissionPct / 100));
+    cardCommissionUsd = round2(usd1 - usdForBinance);
+    cardCommissionBs = round2(cardCommissionUsd * context.bcvRate);
+  } else {
+    cardCommissionBs = round2(base.baseBs * (profile.cardCommissionPct / 100));
+    cardCommissionUsd = round2(cardCommissionBs / context.bcvRate);
+    usdForBinance = base.usdBought;
+  }
+
+  const binancePercentFeeUsd = round2(
+    usdForBinance * (profile.binanceDepositPct / 100),
+  );
+  const binanceFixedFeeUsd = round2(positiveModifier(profile.binanceDepositFixedUsd));
+  const binanceFeeUsd = round2(binancePercentFeeUsd + binanceFixedFeeUsd);
+
+  const interbankCostBs = options.interbankEnabled
+    ? sunkInterbankCostBs !== undefined
+      ? round2(sunkInterbankCostBs)
+      : round2(
+          (profile.interbankBase === 'initial'
+            ? base.baseBs
+            : round2(base.baseBs + base.interventionFeeBs)) *
+            (profile.interbankPct / 100),
+        )
+    : 0;
+
+  let igtfCostBs = 0;
+  let igtfCostUsd = 0;
+  if (options.igtfEnabled) {
+    if (profile.igtfBase === 'card') {
+      if (profile.cardCommissionBase === 'usd') {
+        igtfCostUsd = round2(cardCommissionUsd * (profile.igtfPct / 100));
+      } else {
+        igtfCostBs = round2(cardCommissionBs * (profile.igtfPct / 100));
+      }
+    } else {
+      const investmentBaseBs = round2(
+        base.baseBs +
+          base.interventionFeeBs +
+          interbankCostBs +
+          (profile.cardCommissionBase === 'ves' ? cardCommissionBs : 0),
+      );
+      igtfCostBs = round2(investmentBaseBs * (profile.igtfPct / 100));
+    }
+  }
+
+  const usdDeposited = round2(usdForBinance - binancePercentFeeUsd - igtfCostUsd);
+  if (usdDeposited <= 0) {
+    throw new Error('Las comisiones superan los USD disponibles para operar');
+  }
+
+  const usdtNet = round2(Math.max(0, usdDeposited - binanceFixedFeeUsd));
+  const binanceEffectiveRate = options.slippageEnabled
+    ? context.binanceRate * (1 - profile.slippagePct / 100)
+    : context.binanceRate;
+  const grossSaleBs = round2(usdDeposited * binanceEffectiveRate);
+  const binanceFixedDiscountBs = round2(
+    (usdDeposited - usdtNet) * binanceEffectiveRate,
+  );
+  const bsOut = round2(usdtNet * binanceEffectiveRate);
+  const totalCostBs = round2(
+    base.baseBs +
+      base.interventionFeeBs +
+      interbankCostBs +
+      (profile.cardCommissionBase === 'ves' ? cardCommissionBs : 0) +
+      igtfCostBs,
+  );
+  const netProfitBs = round2(bsOut - totalCostBs);
+  const roiPct = totalCostBs > 0 ? (netProfitBs / totalCostBs) * 100 : 0;
+  const slippageFraction = options.slippageEnabled ? profile.slippagePct / 100 : 0;
+  const effectiveBuyRate =
+    usdtNet > 0 ? totalCostBs / usdtNet / (1 - slippageFraction) : 0;
+  const minGapPct =
+    context.bcvRate > 0
+      ? ((effectiveBuyRate - context.bcvRate) / context.bcvRate) * 100
+      : 0;
+  const profitability: Profitability =
+    roiPct > PROFITABILITY_GREEN_MIN_PCT
+      ? 'green'
+      : roiPct > PROFITABILITY_YELLOW_MIN_PCT
+        ? 'yellow'
+        : 'red';
+
+  return {
+    amountBs: totalCostBs,
+    netForPurchaseBs: base.baseBs,
+    cardCommissionUsd,
+    cardCommissionBs,
+    usdForBinance,
+    binancePercentFeeUsd,
+    binanceFixedFeeUsd,
+    binanceFixedDiscountBs,
+    binanceFeeUsd,
+    usdDeposited,
+    usdtNet,
+    interbankCostBs,
+    igtfCostBs,
+    igtfCostUsd,
+    binanceEffectiveRate,
+    grossSaleBs,
+    bsOut,
+    totalCostBs,
+    netProfitBs,
+    roiPct,
+    effectiveBuyRate,
+    breakEvenRate: effectiveBuyRate,
+    minGapPct,
+    profitability,
+  };
+}
+
 function createWaterfall(
   context: CalculationContext,
-  result: WaterfallSource,
+  result: BaseAmounts & DownstreamAmounts,
 ): WaterfallLine[] {
   const { profile, options } = context;
   const lines: WaterfallLine[] = [
     {
       key: 'investment',
-      label: 'Inversión inicial',
+      label: 'Inversión total',
       amountBs: result.amountBs,
       amountUsd: null,
       kind: 'input',
+    },
+    {
+      key: 'net-purchase',
+      label: 'Base BCV (USD adjudicados × tasa BCV)',
+      amountBs: result.baseBs,
+      amountUsd: null,
+      kind: 'subtotal',
     },
     {
       key: 'intervention',
@@ -161,52 +389,6 @@ function createWaterfall(
       amountBs: -result.interventionFeeBs,
       amountUsd: null,
       kind: 'cost',
-    },
-    {
-      key: 'net-purchase',
-      label: 'Neto para compra de divisas',
-      amountBs: result.netForPurchaseBs,
-      amountUsd: null,
-      kind: 'subtotal',
-    },
-    {
-      key: 'usd-bought',
-      label: 'USD acreditados en banco',
-      amountBs: null,
-      amountUsd: result.usdBought,
-      kind: 'subtotal',
-    },
-    {
-      key: 'card-commission',
-      label: `Comisión de tarjeta (${formatPctLabel(profile.cardCommissionPct)})`,
-      amountBs: profile.cardCommissionBase === 'ves' ? -result.cardCommissionBs : null,
-      amountUsd: profile.cardCommissionBase === 'usd' ? -result.cardCommissionUsd : null,
-      kind: 'cost',
-      detail:
-        profile.cardCommissionBase === 'usd'
-          ? 'Descontada de los USD'
-          : 'Cobrada extra en Bs.S',
-    },
-    {
-      key: 'usd-for-binance',
-      label: 'USD exactos para Binance',
-      amountBs: null,
-      amountUsd: result.usdForBinance,
-      kind: 'subtotal',
-    },
-    {
-      key: 'binance-deposit',
-      label: `Comisión Binance (${formatPctLabel(profile.binanceDepositPct)} + ${formatNumberLabel(profile.binanceDepositFixedUsd)} USD)`,
-      amountBs: null,
-      amountUsd: -result.binanceFeeUsd,
-      kind: 'cost',
-    },
-    {
-      key: 'usdt-net',
-      label: 'USDT netos en billetera',
-      amountBs: null,
-      amountUsd: result.usdDeposited,
-      kind: 'subtotal',
     },
   ];
 
@@ -220,15 +402,83 @@ function createWaterfall(
     });
   }
 
+  lines.push({
+    key: 'card-commission',
+    label: `Comisión de tarjeta (${formatPctLabel(profile.cardCommissionPct)})`,
+    amountBs: profile.cardCommissionBase === 'ves' ? -result.cardCommissionBs : null,
+    amountUsd: profile.cardCommissionBase === 'usd' ? -result.cardCommissionUsd : null,
+    kind: 'cost',
+    detail:
+      profile.cardCommissionBase === 'usd'
+        ? 'Descontada de los USD'
+        : 'Cobrada extra en Bs.S',
+  });
+
   if (options.igtfEnabled) {
     lines.push({
       key: 'igtf',
       label: `IGTF (${formatPctLabel(profile.igtfPct)})`,
-      amountBs: -result.igtfCostBs,
-      amountUsd: null,
+      amountBs: result.igtfCostUsd > 0 ? null : -result.igtfCostBs,
+      amountUsd: result.igtfCostUsd > 0 ? -result.igtfCostUsd : null,
       kind: 'cost',
+      detail:
+        result.igtfCostUsd > 0
+          ? 'Cobrada en USD sobre la tarjeta'
+          : 'Cobrada en Bs.S',
     });
   }
+
+  lines.push(
+    {
+      key: 'usd-bought',
+      label: 'USD adjudicados en banco',
+      amountBs: null,
+      amountUsd: result.usdBought,
+      kind: 'subtotal',
+    },
+    {
+      key: 'usd-for-binance',
+      label: 'USD a ingresar en Binance',
+      amountBs: null,
+      amountUsd: result.usdForBinance,
+      kind: 'subtotal',
+    },
+    {
+      key: 'binance-deposit',
+      label: `Comisión Binance (${formatPctLabel(profile.binanceDepositPct)})`,
+      amountBs: null,
+      amountUsd: -result.binancePercentFeeUsd,
+      kind: 'cost',
+    },
+    {
+      key: 'usdt-net',
+      label: 'USDT tras comisión % de Binance',
+      amountBs: null,
+      amountUsd: result.usdDeposited,
+      kind: 'subtotal',
+    },
+  );
+
+  if (result.binanceFixedFeeUsd > 0) {
+    lines.push({
+      key: 'binance-fixed',
+      label: `Comisión fija P2P (${formatNumberLabel(result.binanceFixedFeeUsd)} USDT)`,
+      amountBs: -result.binanceFixedDiscountBs,
+      amountUsd: -(result.usdDeposited - result.usdtNet),
+      kind: 'cost',
+      detail: 'Valorada a la tasa efectiva de venta, no a BCV',
+    });
+  }
+
+  lines.push(
+    {
+      key: 'usdt-sale-net',
+      label: 'USDT netos para la venta',
+      amountBs: null,
+      amountUsd: result.usdtNet,
+      kind: 'subtotal',
+    },
+  );
 
   if (options.slippageEnabled) {
     lines.push({
@@ -243,8 +493,15 @@ function createWaterfall(
 
   lines.push(
     {
+      key: 'gross-sale',
+      label: 'Venta bruta P2P',
+      amountBs: result.grossSaleBs,
+      amountUsd: null,
+      kind: 'subtotal',
+    },
+    {
       key: 'bs-out',
-      label: 'Retorno bruto al vender',
+      label: 'Retorno neto al vender',
       amountBs: result.bsOut,
       amountUsd: null,
       kind: 'output',
@@ -266,91 +523,6 @@ function createWaterfall(
   );
 
   return lines;
-}
-
-function calculateDownstream(
-  base: CalculationBase,
-  context: CalculationContext,
-  sunkInterbankCostBs?: number,
-): DownstreamAmounts {
-  const { profile, options } = context;
-  let cardCommissionUsd: number;
-  let cardCommissionBs: number;
-  let usdForBinance: number;
-
-  if (profile.cardCommissionBase === 'usd') {
-    // Gross-up: the card fee is charged over the amount that actually reaches
-    // Binance, so the deposit is USD_1 / (1 + pct/100) and the retained fee is
-    // the difference. This matches bank cuts on the deposited amount.
-    usdForBinance = round2(base.usdBought / (1 + profile.cardCommissionPct / 100));
-    cardCommissionUsd = round2(base.usdBought - usdForBinance);
-    cardCommissionBs = round2(cardCommissionUsd * context.bcvRate);
-  } else {
-    cardCommissionBs = round2(base.netForPurchaseBs * (profile.cardCommissionPct / 100));
-    cardCommissionUsd = round2(cardCommissionBs / context.bcvRate);
-    usdForBinance = base.usdBought;
-  }
-
-  const binanceFeeUsd = round2(
-    usdForBinance * (profile.binanceDepositPct / 100) + profile.binanceDepositFixedUsd,
-  );
-  const usdDeposited = round2(usdForBinance - binanceFeeUsd);
-  if (usdDeposited <= 0) {
-    throw new Error('Las comisiones superan los USD disponibles para operar');
-  }
-
-  const interbankCostBs = options.interbankEnabled
-    ? sunkInterbankCostBs !== undefined
-      ? round2(sunkInterbankCostBs)
-      : round2(
-          (profile.interbankBase === 'initial' ? base.amountBs : base.netForPurchaseBs) *
-            (profile.interbankPct / 100),
-        )
-    : 0;
-  const igtfCostBs = options.igtfEnabled
-    ? round2(
-        (profile.igtfBase === 'card' ? cardCommissionBs : base.amountBs) *
-          (profile.igtfPct / 100),
-      )
-    : 0;
-  const binanceEffectiveRate = options.slippageEnabled
-    ? context.binanceRate * (1 - profile.slippagePct / 100)
-    : context.binanceRate;
-  const bsOut = round2(usdDeposited * binanceEffectiveRate);
-  const totalCostBs = round2(
-    base.amountBs +
-      interbankCostBs +
-      (profile.cardCommissionBase === 'ves' ? cardCommissionBs : 0) +
-      igtfCostBs,
-  );
-  const netProfitBs = round2(bsOut - totalCostBs);
-  const roiPct = totalCostBs > 0 ? (netProfitBs / totalCostBs) * 100 : 0;
-  const breakEvenRate = totalCostBs / usdDeposited;
-  const minGapPct = ((breakEvenRate - context.bcvRate) / context.bcvRate) * 100;
-  const profitability: Profitability =
-    roiPct > PROFITABILITY_GREEN_MIN_PCT
-      ? 'green'
-      : roiPct > PROFITABILITY_YELLOW_MIN_PCT
-        ? 'yellow'
-        : 'red';
-
-  return {
-    cardCommissionUsd,
-    cardCommissionBs,
-    usdForBinance,
-    binanceFeeUsd,
-    usdDeposited,
-    interbankCostBs,
-    igtfCostBs,
-    binanceEffectiveRate,
-    bsOut,
-    totalCostBs,
-    netProfitBs,
-    roiPct,
-    breakEvenRate,
-    minGapPct,
-    profitability,
-  };
 }
 
 function contextFromInput(input: CalculationInput): CalculationContext {
@@ -396,25 +568,11 @@ export function calculate(input: CalculationInput): CalculationResult {
     throw new Error('La tasa Binance debe ser mayor que 0');
   }
 
-  let amountBs: number;
-  if (input.mode === 'usd') {
-    const targetUsd = round2(input.amount);
-    const netForPurchaseTargetBs = round2(targetUsd * input.bcvRate);
-    amountBs = round2(netForPurchaseTargetBs / (1 - INTERVENTION_PCT / 100));
-  } else {
-    amountBs = round2(input.amount);
-  }
-
-  const interventionFeeBs = round2(amountBs * (INTERVENTION_PCT / 100));
-  const netForPurchaseBs = round2(amountBs - interventionFeeBs);
-  const usdBought = round2(netForPurchaseBs / input.bcvRate);
   const context = contextFromInput(input);
-  const base: CalculationBase = {
-    amountBs,
-    interventionFeeBs,
-    netForPurchaseBs,
-    usdBought,
-  };
+  const base =
+    input.mode === 'usd'
+      ? baseFromUsd(round2(input.amount), input.bcvRate)
+      : solveBaseForTotal(round2(input.amount), context);
   const downstream = calculateDownstream(base, context);
 
   const snapshot: CalculationSnapshot = {
@@ -422,19 +580,23 @@ export function calculate(input: CalculationInput): CalculationResult {
     profileName: input.profile.name,
     mode: input.mode,
     inputAmount: input.amount,
-    amountBs,
+    amountBs: downstream.amountBs,
+    netForPurchaseBs: downstream.netForPurchaseBs,
+    baseBs: base.baseBs,
+    bcvPurchaseBs: base.bcvPurchaseBs,
     bcvRate: input.bcvRate,
     binanceRate: input.binanceRate,
     interventionPct: INTERVENTION_PCT,
-    interventionFeeBs,
-    netForPurchaseBs,
+    interventionFeeBs: base.interventionFeeBs,
     cardCommissionPct: input.profile.cardCommissionPct,
     cardCommissionBase: input.profile.cardCommissionBase,
     cardCommissionUsd: downstream.cardCommissionUsd,
     cardCommissionBs: downstream.cardCommissionBs,
     binanceDepositPct: input.profile.binanceDepositPct,
     binanceDepositFixedUsd: input.profile.binanceDepositFixedUsd,
-    binanceDepositUsd: downstream.binanceFeeUsd,
+    binanceDepositUsd: downstream.binancePercentFeeUsd,
+    binancePercentFeeUsd: downstream.binancePercentFeeUsd,
+    binanceFixedDiscountBs: downstream.binanceFixedDiscountBs,
     interbankEnabled: input.options.interbankEnabled,
     interbankPct: input.profile.interbankPct,
     interbankBase: input.profile.interbankBase,
@@ -443,8 +605,11 @@ export function calculate(input: CalculationInput): CalculationResult {
     igtfPct: input.profile.igtfPct,
     igtfBase: input.profile.igtfBase,
     igtfCostBs: downstream.igtfCostBs,
+    igtfCostUsd: downstream.igtfCostUsd,
     slippageEnabled: input.options.slippageEnabled,
     slippagePct: input.profile.slippagePct,
+    usdtNet: downstream.usdtNet,
+    effectiveBuyRate: downstream.effectiveBuyRate,
   };
 
   const result: CalculationResult = {
@@ -481,37 +646,23 @@ export function recalculateAccreditation(
 
   const isTotal = normalizedAccreditedUsd === requestedUsd;
   const context = contextFromSnapshot(purchase.snapshot);
-  const base: CalculationBase = isTotal
-    ? {
-        amountBs: round2(purchase.requestedInvestmentVes),
-        interventionFeeBs: purchase.snapshot.interventionFeeBs,
-        netForPurchaseBs: purchase.snapshot.netForPurchaseBs,
-        usdBought: requestedUsd,
-      }
-    : (() => {
-        const netForPurchaseBs = round2(normalizedAccreditedUsd * purchase.snapshot.bcvRate);
-        const executedAmountBs = round2(
-          netForPurchaseBs / (1 - INTERVENTION_PCT / 100),
-        );
-        return {
-          amountBs: executedAmountBs,
-          interventionFeeBs: round2(executedAmountBs - netForPurchaseBs),
-          netForPurchaseBs,
-          usdBought: normalizedAccreditedUsd,
-        };
-      })();
+
+  // The snapshot's netForPurchaseBs is the original Base_Bs. For total
+  // accreditation, using it reproduces the initial waterfall exactly.
+  const base =
+    isTotal && purchase.snapshot.netForPurchaseBs > 0
+      ? baseFromBaseBs(purchase.snapshot.netForPurchaseBs, purchase.snapshot.bcvRate)
+      : baseFromUsd(normalizedAccreditedUsd, purchase.snapshot.bcvRate);
 
   const effectiveKeepInterbankSunk =
-    purchase.snapshot.interbankEnabled && keepInterbankSunk;
+    !isTotal && purchase.snapshot.interbankEnabled && keepInterbankSunk;
   const downstream = calculateDownstream(
     base,
     context,
     effectiveKeepInterbankSunk ? purchase.snapshot.interbankCostBs : undefined,
   );
-  const refundedVes = Math.max(
-    0,
-    round2(round2(purchase.requestedInvestmentVes) - base.amountBs),
-  );
+  const requestedInvestment = round2(purchase.requestedInvestmentVes);
+  const refundedVes = Math.max(0, round2(requestedInvestment - downstream.amountBs));
   const accreditationRatePercent = (normalizedAccreditedUsd / requestedUsd) * 100;
 
   const result: AccreditationResult = {

@@ -41,7 +41,14 @@ export function calculateExecution(
     throw new Error('La tasa real de venta debe ser mayor que 0');
   }
 
-  const executedBsOut = round2(purchase.usdDeposited * realBinanceRate);
+  // New records keep USD_3 (before the fixed P2P fee) in usdDeposited, so the
+  // fixed fee must be deducted at sale. Legacy records stored usdDeposited after
+  // that fee; usdtNet marks the new semantics and avoids double subtraction.
+  const saleUsd =
+    purchase.snapshot.usdtNet !== undefined
+      ? Math.max(0, purchase.usdDeposited - purchase.snapshot.binanceDepositFixedUsd)
+      : purchase.usdDeposited;
+  const executedBsOut = round2(saleUsd * realBinanceRate);
   const executedProfitBs = round2(executedBsOut - purchase.totalCostBs);
   const executedRoiPct =
     purchase.totalCostBs > 0 ? (executedProfitBs / purchase.totalCostBs) * 100 : 0;

@@ -181,3 +181,4 @@ reproducible from its snapshot even after profiles/rates change.
   tests updated; a dedicated 300 USD gross-up case added. Profile form hint documents
   the formula. Suite now 52 tests green.
 - Change request applied: demo data loading removed at user request (App button/dialog, store `loadDemoData` and demo helpers, demo store test). App smoke test now asserts the empty state; suite 55 tests including the financial table/action and calculator profile-priority tests.
+- Financial audit applied: intervention on Base_Bs, card inverse fee, Binance percentage on USD_2, fixed USDT P2P fee deducted at sale at the effective rate, effectiveBuyRate independent of the market P2P quote, symmetric Bs.S/USD inverse. 73 tests green; build green.

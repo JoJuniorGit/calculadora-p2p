@@ -104,6 +104,10 @@ export interface CalculationSnapshot {
   interventionPct: number;
   interventionFeeBs: number;
   netForPurchaseBs: number;
+  /** Bs.S value of USD_1 at the BCV rate (Base_Bs). */
+  baseBs?: number;
+  /** Bs.S dedicated to the BCV purchase plus intervention. */
+  bcvPurchaseBs?: number;
   cardCommissionPct: number;
   cardCommissionBase: CommissionBase;
   cardCommissionUsd: number;
@@ -111,6 +115,10 @@ export interface CalculationSnapshot {
   binanceDepositPct: number;
   binanceDepositFixedUsd: number;
   binanceDepositUsd: number;
+  /** Percentage-only Binance deposit fee (new records). */
+  binancePercentFeeUsd?: number;
+  /** Bs.S value of the fixed P2P fee at the effective sale rate (new records). */
+  binanceFixedDiscountBs?: number;
   interbankEnabled: boolean;
   interbankPct: number;
   interbankBase: InterbankBase;
@@ -119,32 +127,57 @@ export interface CalculationSnapshot {
   igtfPct: number;
   igtfBase: IgtfBase;
   igtfCostBs: number;
+  /** IGTF charged in USD when the card charge is USD-denominated (new records). */
+  igtfCostUsd?: number;
   slippageEnabled: boolean;
   slippagePct: number;
+  /** USDT net after the fixed P2P fee (new records). */
+  usdtNet?: number;
+  /** Minimum sale rate for zero profit (new records). */
+  effectiveBuyRate?: number;
 }
 
 export interface CalculationResult {
   mode: CalculationMode;
   inputAmount: number;
+  /** Total Bs.S cost of the operation (Base_Bs + all Bs.S fees). */
   amountBs: number;
   interventionFeeBs: number;
   netForPurchaseBs: number;
+  /** Bs.S value of USD_1 at the BCV rate (Base_Bs). */
+  baseBs: number;
+  /** Bs.S dedicated to the BCV purchase plus intervention. */
+  bcvPurchaseBs: number;
   /** USD credited at the bank (USD_1). */
   usdBought: number;
   /** USD that travels through the Binance gateway (USD_2). */
   usdForBinance: number;
-  /** USDT net in wallet after Binance fees (USD_3). */
+  /** USDT after the percentage Binance fee and USD IGTF (USD_3, before the fixed P2P fee). */
   usdDeposited: number;
+  /** USDT after the fixed P2P fee, ready to sell. */
+  usdtNet: number;
   cardCommissionUsd: number;
   cardCommissionBs: number;
+  /** Percentage-only Binance deposit fee. */
+  binancePercentFeeUsd: number;
+  /** Fixed P2P fee in USDT. */
+  binanceFixedFeeUsd: number;
+  /** Bs.S value of the fixed P2P fee at the effective sale rate. */
+  binanceFixedDiscountBs: number;
+  /** Legacy total (percentage + fixed) for display compatibility. */
   binanceFeeUsd: number;
   interbankCostBs: number;
   igtfCostBs: number;
+  igtfCostUsd: number;
   binanceEffectiveRate: number;
+  /** Gross P2P sale value before the fixed P2P fee. */
+  grossSaleBs: number;
   bsOut: number;
   totalCostBs: number;
   netProfitBs: number;
   roiPct: number;
+  /** Minimum sale rate for zero profit (never depends on binanceRate). */
+  effectiveBuyRate: number;
   breakEvenRate: number;
   minGapPct: number;
   profitability: Profitability;
