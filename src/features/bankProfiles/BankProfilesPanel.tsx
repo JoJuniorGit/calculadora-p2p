@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BankProfile, BankProfileDraft } from '../../domain/types';
-import { formatPct, formatUsd } from '../../utils/format';
+import { formatPct, formatPctWithFixedUsd } from '../../utils/format';
 import { useAppStore } from '../../store/useAppStore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -108,9 +108,16 @@ export function BankProfilesPanel() {
                   <dt className={styles.commissionLabel}>Binance</dt>
                   <dd className={styles.commissionContent}>
                     <strong className={styles.commissionValue}>
-                      {formatPct(profile.binanceDepositPct)} + {formatUsd(profile.binanceDepositFixedUsd)}
+                      {formatPctWithFixedUsd(
+                        profile.binanceDepositPct,
+                        profile.binanceDepositFixedUsd,
+                      )}
                     </strong>
-                    <span className={styles.commissionSubline}>Porcentaje más cargo fijo por depósito</span>
+                    <span className={styles.commissionSubline}>
+                      {Number(profile.binanceDepositFixedUsd.toFixed(2)) > 0
+                        ? 'Porcentaje más cargo fijo por depósito'
+                        : 'Porcentaje sobre el depósito'}
+                    </span>
                   </dd>
                 </div>
                 <div className={styles.commissionTile}>

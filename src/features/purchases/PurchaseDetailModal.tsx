@@ -6,6 +6,7 @@ import {
   formatBs,
   formatDateTime,
   formatPct,
+  formatPctWithFixedUsd,
   formatRate,
   formatUsd,
   toInputNumber,
@@ -248,7 +249,7 @@ export function PurchaseDetailModal({ purchaseId, onClose }: PurchaseDetailModal
     },
     {
       label: 'Depósito Binance',
-      value: `${formatProfilePct(snapshot.binanceDepositPct)} + ${formatUsd(snapshot.binanceDepositFixedUsd)} fijo · comisión aplicada ${formatUsd(snapshot.binanceDepositUsd)}`,
+      value: `${formatPctWithFixedUsd(snapshot.binanceDepositPct, snapshot.binanceDepositFixedUsd, Number.isInteger(snapshot.binanceDepositPct) ? 0 : 2)} · comisión aplicada ${formatUsd(snapshot.binanceDepositUsd)}`,
     },
     {
       label: 'Interbancario',

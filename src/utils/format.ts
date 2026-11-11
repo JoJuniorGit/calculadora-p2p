@@ -40,6 +40,20 @@ export function formatPct(value: number, digits = 2): string {
   return `${formatter.format(value)}%`;
 }
 
+/** Formats a percentage and only appends a fixed USD charge when it is non-zero. */
+export function formatPctWithFixedUsd(
+  pct: number,
+  fixedUsd: number,
+  pctDigits = 2,
+): string {
+  const pctLabel = formatPct(pct, pctDigits);
+  if (!Number.isFinite(fixedUsd) || Number(fixedUsd.toFixed(2)) <= 0) {
+    return pctLabel;
+  }
+
+  return pct <= 0 ? formatUsd(fixedUsd) : `${pctLabel} + ${formatUsd(fixedUsd)}`;
+}
+
 export function formatRate(value: number): string {
   return rateFormatter.format(value);
 }

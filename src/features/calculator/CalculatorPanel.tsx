@@ -8,7 +8,7 @@ import type {
 } from '../../domain/types';
 import { calculate, getExchangeGap } from '../../domain/calculations';
 import { useAppStore } from '../../store/useAppStore';
-import { formatBs, formatPct, formatRate, formatUsd } from '../../utils/format';
+import { formatBs, formatPct, formatPctWithFixedUsd, formatRate, formatUsd } from '../../utils/format';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -319,8 +319,12 @@ export function CalculatorPanel() {
                       Tarjeta: {formatProfilePct(selectedProfile.cardCommissionPct)}
                     </span>
                     <span className={styles.quickFact} title="Comisión de depósito Binance">
-                      Binance: {formatProfilePct(selectedProfile.binanceDepositPct)} +{' '}
-                      {formatUsd(selectedProfile.binanceDepositFixedUsd)}
+                      Binance:{' '}
+                      {formatPctWithFixedUsd(
+                        selectedProfile.binanceDepositPct,
+                        selectedProfile.binanceDepositFixedUsd,
+                        Number.isInteger(selectedProfile.binanceDepositPct) ? 0 : 2,
+                      )}
                     </span>
                     <span className={styles.quickFact} title="Costo interbancario predeterminado">
                       Interbancario:{' '}
@@ -493,7 +497,7 @@ export function CalculatorPanel() {
       </div>
 
       <div className={styles.receiptColumn}>
-        <Card title="Resultado de la operación" className={styles.resultsCard}>
+        <Card title="Resumen de la Operación" className={styles.resultsCard}>
           <div className={styles.receiptContent}>
             {!calculation.ratesConfigured && (
               <p className={styles.receiptHint} role="note">
@@ -502,28 +506,46 @@ export function CalculatorPanel() {
             )}
 
             <div className={styles.heroGrid}>
-              <article className={`${styles.heroMetric} ${styles.primaryMetric}`}>
-                <span className={styles.metricLabel}>Monto exacto a digitar en Binance</span>
+              <article
+                className={styles.heroMetric}
+                title="Monto en Bs.S dedicado a la compra BCV + 0,50%."
+              >
+                <span className={styles.metricLabel}>Inversión</span>
+                <strong className={styles.heroValue}>{formatBs(result?.amountBs ?? 0)}</strong>
+              </article>
+              <article
+                className={`${styles.heroMetric} ${styles.secondaryMetric}`}
+                title="Total en Bs.S esperado por la venta de las divisas."
+              >
+                <span className={styles.metricLabel}>Retorno</span>
+                <div className={styles.heroValueRow}>
+                  <strong className={styles.heroValue}>{formatBs(result?.bsOut ?? 0)}</strong>
+                  <CopyButton
+                    value={(result?.bsOut ?? 0).toFixed(2)}
+                    label="retorno en Bs.S"
+                    disabled={!result}
+                  />
+                </div>
+              </article>
+              <article
+                className={styles.heroMetric}
+                title="Total de divisas adquiridas en el banco."
+              >
+                <span className={styles.metricLabel}>USD Adjudicados</span>
+                <strong className={styles.heroValue}>{formatUsd(result?.usdBought ?? 0)}</strong>
+              </article>
+              <article
+                className={`${styles.heroMetric} ${styles.primaryMetric}`}
+                title="USD máximos para depositar en Binance, después de la comisión de la tarjeta."
+              >
+                <span className={styles.metricLabel}>Monto a Ingresar en Binance</span>
                 <div className={styles.heroValueRow}>
                   <strong className={styles.heroValue} data-testid="binance-amount">
                     {formatUsd(result?.usdForBinance ?? 0)}
                   </strong>
                   <CopyButton
                     value={(result?.usdForBinance ?? 0).toFixed(2)}
-                    label="monto de Binance"
-                    disabled={!result}
-                  />
-                </div>
-              </article>
-              <article className={`${styles.heroMetric} ${styles.secondaryMetric}`}>
-                <span className={styles.metricLabel}>Bs.S a recibir</span>
-                <div className={styles.heroValueRow}>
-                  <strong className={styles.heroValue}>
-                    {formatBs(result?.bsOut ?? 0)}
-                  </strong>
-                  <CopyButton
-                    value={(result?.bsOut ?? 0).toFixed(2)}
-                    label="monto en Bs.S a recibir"
+                    label="monto a ingresar en Binance"
                     disabled={!result}
                   />
                 </div>
