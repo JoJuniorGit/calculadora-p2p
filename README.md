@@ -61,6 +61,8 @@ El cálculo aplica una comisión fija de intervención de 0,50% y admite dos ent
 | IGTF | Opcional; se calcula sobre el cargo de la tarjeta o sobre la inversión total en Bs.S. |
 | Slippage | Opcional; ajusta la tasa Binance usada en la estimación. |
 
+Los costos de IGTF y slippage solo se muestran en la calculadora y en la tarjeta del perfil cuando están activos en la configuración del banco. El formulario de perfil siempre permite configurarlos.
+
 El motor calcula la tasa de equilibrio y la brecha mínima requerida. La señal de rentabilidad es verde para ROI mayor que 3%, amarilla para ROI mayor que 0% y roja para ROI menor o igual que 0%.
 
 ## Registros y auditoría
@@ -95,11 +97,11 @@ src/
 └── utils/                # Formato e identificadores
 ```
 
-La navegación del shell incluye las cuatro pestañas operativas: Tasas, Perfiles, Calculadora y Registros.
+La navegación del shell incluye cuatro pestañas operativas en este orden: Calculadora, Perfiles, Tasas y Registros. La sección activa se conserva al recargar; sin una sección guardada, la app abre en Calculadora.
 
 ## Pruebas
 
-Las 51 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta y un smoke test de render cliente del shell con estado vacío.
+Las 54 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta, la tabla financiera y las acciones de Registros, y un smoke test de render cliente del shell con estado vacío.
 
 ## Aviso
 

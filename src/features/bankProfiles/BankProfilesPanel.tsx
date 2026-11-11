@@ -127,32 +127,32 @@ export function BankProfilesPanel() {
                     </span>
                   </dd>
                 </div>
-                <div className={styles.commissionTile}>
-                  <dt className={styles.commissionLabel}>IGTF</dt>
-                  <dd className={styles.commissionContent}>
-                    <span className={styles.commissionStatusValue}>
-                      <Badge tone={profile.igtfEnabled ? 'success' : 'neutral'}>
-                        {profile.igtfEnabled ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                      <strong className={styles.commissionValue}>{formatPct(profile.igtfPct)}</strong>
-                    </span>
-                    <span className={styles.commissionSubline}>
-                      {igtfBaseLabel(profile.igtfBase)}
-                    </span>
-                  </dd>
-                </div>
-                <div className={styles.commissionTile}>
-                  <dt className={styles.commissionLabel}>Slippage</dt>
-                  <dd className={styles.commissionContent}>
-                    <span className={styles.commissionStatusValue}>
-                      <Badge tone={profile.slippageEnabled ? 'success' : 'neutral'}>
-                        {profile.slippageEnabled ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                      <strong className={styles.commissionValue}>{formatPct(profile.slippagePct)}</strong>
-                    </span>
-                    <span className={styles.commissionSubline}>Ajuste sobre la tasa Binance P2P</span>
-                  </dd>
-                </div>
+                {profile.igtfEnabled && (
+                  <div className={styles.commissionTile}>
+                    <dt className={styles.commissionLabel}>IGTF</dt>
+                    <dd className={styles.commissionContent}>
+                      <span className={styles.commissionStatusValue}>
+                        <Badge tone="success">Activo</Badge>
+                        <strong className={styles.commissionValue}>{formatPct(profile.igtfPct)}</strong>
+                      </span>
+                      <span className={styles.commissionSubline}>
+                        {igtfBaseLabel(profile.igtfBase)}
+                      </span>
+                    </dd>
+                  </div>
+                )}
+                {profile.slippageEnabled && (
+                  <div className={styles.commissionTile}>
+                    <dt className={styles.commissionLabel}>Slippage</dt>
+                    <dd className={styles.commissionContent}>
+                      <span className={styles.commissionStatusValue}>
+                        <Badge tone="success">Activo</Badge>
+                        <strong className={styles.commissionValue}>{formatPct(profile.slippagePct)}</strong>
+                      </span>
+                      <span className={styles.commissionSubline}>Ajuste sobre la tasa Binance P2P</span>
+                    </dd>
+                  </div>
+                )}
               </dl>
               <div className={styles.notes}>
                 <span className={styles.notesLabel}>Notas</span>

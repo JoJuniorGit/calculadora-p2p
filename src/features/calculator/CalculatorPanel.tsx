@@ -301,6 +301,41 @@ export function CalculatorPanel() {
         <Card title="Calculadora P2P" className={styles.calculatorCard}>
           <div className={styles.formContent}>
             <div className={styles.entryGrid}>
+              {selectedProfile ? (
+                <div className={styles.profileField}>
+                  <SelectField
+                    label="Perfil bancario"
+                    name="calculator-profile"
+                    value={selectedProfile.id}
+                    onChange={handleProfileChange}
+                    options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))}
+                    hint="Los costos y comisiones de esta operación se toman de este perfil."
+                  />
+                  <div className={styles.profileQuickFacts} aria-label="Resumen del perfil bancario">
+                    <span
+                      className={styles.quickFact}
+                      title={`Comisión de tarjeta sobre ${selectedProfile.cardCommissionBase === 'usd' ? 'USD' : 'Bs.S'}`}
+                    >
+                      Tarjeta: {formatProfilePct(selectedProfile.cardCommissionPct)}
+                    </span>
+                    <span className={styles.quickFact} title="Comisión de depósito Binance">
+                      Binance: {formatProfilePct(selectedProfile.binanceDepositPct)} +{' '}
+                      {formatUsd(selectedProfile.binanceDepositFixedUsd)}
+                    </span>
+                    <span className={styles.quickFact} title="Costo interbancario predeterminado">
+                      Interbancario:{' '}
+                      {selectedProfile.interbankEnabled
+                        ? formatProfilePct(selectedProfile.interbankPct)
+                        : 'off'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className={styles.rateHint} role="note">
+                  No hay perfiles bancarios configurados. Crea uno en la pestaña Perfiles para registrar una operación.
+                </p>
+              )}
+
               <div className={styles.modeField}>
                 <span className={styles.fieldLabel}>Modo de entrada</span>
                 <div className={styles.modeSelector} role="group" aria-label="Modo de cálculo">
@@ -346,40 +381,6 @@ export function CalculatorPanel() {
                 error={amountTouched ? calculation.amountError : undefined}
                 hint={amountHint}
               />
-
-              {selectedProfile ? (
-                <div className={styles.profileField}>
-                  <SelectField
-                    label="Perfil bancario"
-                    name="calculator-profile"
-                    value={selectedProfile.id}
-                    onChange={handleProfileChange}
-                    options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))}
-                  />
-                  <div className={styles.profileQuickFacts} aria-label="Resumen del perfil bancario">
-                    <span
-                      className={styles.quickFact}
-                      title={`Comisión de tarjeta sobre ${selectedProfile.cardCommissionBase === 'usd' ? 'USD' : 'Bs.S'}`}
-                    >
-                      Tarjeta: {formatProfilePct(selectedProfile.cardCommissionPct)}
-                    </span>
-                    <span className={styles.quickFact} title="Comisión de depósito Binance">
-                      Binance: {formatProfilePct(selectedProfile.binanceDepositPct)} +{' '}
-                      {formatUsd(selectedProfile.binanceDepositFixedUsd)}
-                    </span>
-                    <span className={styles.quickFact} title="Costo interbancario predeterminado">
-                      Interbancario:{' '}
-                      {selectedProfile.interbankEnabled
-                        ? formatProfilePct(selectedProfile.interbankPct)
-                        : 'off'}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <p className={styles.rateHint} role="note">
-                  No hay perfiles bancarios configurados. Crea uno en la pestaña Perfiles para registrar una operación.
-                </p>
-              )}
             </div>
 
             <dl className={styles.rateSummary} aria-label="Tasas actuales">
@@ -431,27 +432,34 @@ export function CalculatorPanel() {
                       }));
                     }}
                   />
-                  <FilterChip
-                    label={`IGTF ${formatProfilePct(selectedProfile.igtfPct)}`}
-                    active={options.igtfEnabled}
-                    title="Alterna el IGTF para este cálculo"
-                    onToggle={() => {
-                      clearFeedback();
-                      setOptions((current) => ({ ...current, igtfEnabled: !current.igtfEnabled }));
-                    }}
-                  />
-                  <FilterChip
-                    label={`Slippage ${formatProfilePct(selectedProfile.slippagePct)}`}
-                    active={options.slippageEnabled}
-                    title="Alterna el slippage para este cálculo"
-                    onToggle={() => {
-                      clearFeedback();
-                      setOptions((current) => ({
-                        ...current,
-                        slippageEnabled: !current.slippageEnabled,
-                      }));
-                    }}
-                  />
+                  {selectedProfile.igtfEnabled && (
+                    <FilterChip
+                      label={`IGTF ${formatProfilePct(selectedProfile.igtfPct)}`}
+                      active={options.igtfEnabled}
+                      title="Alterna el IGTF para este cálculo"
+                      onToggle={() => {
+                        clearFeedback();
+                        setOptions((current) => ({
+                          ...current,
+                          igtfEnabled: !current.igtfEnabled,
+                        }));
+                      }}
+                    />
+                  )}
+                  {selectedProfile.slippageEnabled && (
+                    <FilterChip
+                      label={`Slippage ${formatProfilePct(selectedProfile.slippagePct)}`}
+                      active={options.slippageEnabled}
+                      title="Alterna el slippage para este cálculo"
+                      onToggle={() => {
+                        clearFeedback();
+                        setOptions((current) => ({
+                          ...current,
+                          slippageEnabled: !current.slippageEnabled,
+                        }));
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             )}

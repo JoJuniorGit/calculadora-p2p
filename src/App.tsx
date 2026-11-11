@@ -16,12 +16,36 @@ import styles from './App.module.css';
 
 type AppTab = 'rates' | 'profiles' | 'calculator' | 'records';
 
+export const ACTIVE_TAB_STORAGE_KEY = 'calculadora-p2p:active-tab';
+
 const tabs: Array<{ id: AppTab; label: string }> = [
-  { id: 'rates', label: 'Tasas' },
-  { id: 'profiles', label: 'Perfiles' },
   { id: 'calculator', label: 'Calculadora' },
+  { id: 'profiles', label: 'Perfiles' },
+  { id: 'rates', label: 'Tasas' },
   { id: 'records', label: 'Registros' },
 ];
+
+function isAppTab(value: string): value is AppTab {
+  return tabs.some((tab) => tab.id === value);
+}
+
+function readStoredTab(): AppTab {
+  try {
+    if (typeof window === 'undefined') return 'calculator';
+    const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    return stored !== null && isAppTab(stored) ? stored : 'calculator';
+  } catch {
+    return 'calculator';
+  }
+}
+
+function persistActiveTab(tab: AppTab): void {
+  try {
+    window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
+  } catch {
+    // Storage can be unavailable in private/full modes; the tab remains in memory.
+  }
+}
 
 const tickerNumberFormatter = new Intl.NumberFormat('es-VE', {
   minimumFractionDigits: 2,
@@ -72,7 +96,7 @@ export default function App() {
   const disclaimer = useAppStore((state) => state.disclaimer);
   const rates = useAppStore((state) => state.rates);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
-  const [activeTab, setActiveTab] = useState<AppTab>('rates');
+  const [activeTab, setActiveTab] = useState<AppTab>(readStoredTab);
   const ratesConfigured =
     Number.isFinite(rates.bcv.value) &&
     rates.bcv.value > 0 &&
@@ -94,6 +118,10 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    persistActiveTab(activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {

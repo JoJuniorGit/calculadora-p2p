@@ -43,7 +43,7 @@ reproducible from its snapshot even after profiles/rates change.
 - Records export/import JSON + CSV with `schemaVersion`; config export/import JSON.
 - Zod validation for user input and import schemas.
 - Editable/hideable legal disclaimer banner (disabled by default).
-- Tabs: Tasas, Perfiles, Calculadora, Registros. Responsive (table -> cards on mobile).
+- Tabs: Calculadora, Perfiles, Tasas, Registros (initial: Calculadora; active section persisted in a UI localStorage key). Responsive (table -> cards on mobile).
 - "Cargar datos demo": removed post-delivery at user request (button, modal, store action/helpers and demo test).
 - Vitest mandatory for the engine: IEEE 754 rounding, Bs vs USD cost ROI difference,
   break-even -> exactly 0 profit, negative profit, Bs input vs USD input modes.
@@ -180,4 +180,4 @@ reproducible from its snapshot even after profiles/rates change.
   percentage on `USD_1`. Canonical expected values, IGTF-card, slippage and waterfall
   tests updated; a dedicated 300 USD gross-up case added. Profile form hint documents
   the formula. Suite now 52 tests green.
-- Change request applied: demo data loading removed at user request (App button/dialog, store `loadDemoData` and demo helpers, demo store test). App smoke test now asserts the empty state; suite 51 tests.
+- Change request applied: demo data loading removed at user request (App button/dialog, store `loadDemoData` and demo helpers, demo store test). App smoke test now asserts the empty state; suite 54 tests including the financial table/action tests.

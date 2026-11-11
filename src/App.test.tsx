@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import App from './App';
+import App, { ACTIVE_TAB_STORAGE_KEY } from './App';
 import { useAppStore } from './store/useAppStore';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -53,6 +53,9 @@ describe('client render smoke', () => {
     });
 
     expect(container.textContent).toContain('Calculadora P2P');
+    expect(container.querySelector('[aria-current="page"]')?.textContent?.trim()).toBe(
+      'Calculadora',
+    );
 
     clickButton('Calculadora');
     expect(container.textContent).toContain('Monto a invertir');
@@ -62,5 +65,6 @@ describe('client render smoke', () => {
     clickButton('Registros');
     expect(container.textContent).toContain('Capital en tránsito');
     expect(container.textContent).toContain('Todavía no hay compras registradas');
+    expect(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)).toBe('records');
   });
 });
