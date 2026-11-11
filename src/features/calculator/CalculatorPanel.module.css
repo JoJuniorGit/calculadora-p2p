@@ -291,3 +291,342 @@
     width: 100%;
   }
 }
+
+.panel {
+  grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.panel > .successFeedback,
+.panel > .errorFeedback {
+  grid-column: 1 / -1;
+}
+
+.calculatorColumn,
+.receiptColumn {
+  min-width: 0;
+}
+
+.calculatorColumn {
+  grid-column: 1;
+}
+
+.receiptColumn {
+  position: sticky;
+  top: 1rem;
+  display: grid;
+  grid-column: 2;
+  align-self: start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.calculatorCard,
+.resultsCard,
+.waterfallCard {
+  min-width: 0;
+}
+
+.formContent,
+.receiptContent {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.entryGrid {
+  column-gap: 0.8rem;
+  row-gap: 0.9rem;
+}
+
+.modeSelector {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+}
+
+.modeButton {
+  min-height: 40px;
+  font-size: 0.84rem;
+}
+
+.modeButtonActive,
+.modeButtonActive:hover {
+  border-color: var(--primary-glow);
+  background: var(--bg-elevated);
+  box-shadow: var(--focus-ring);
+}
+
+.profileQuickFacts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  min-width: 0;
+  margin-top: 0.65rem;
+}
+
+.quickFact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.69rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.rateSummary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.8rem;
+  background: var(--bg-elevated);
+}
+
+.rateItemFull {
+  grid-column: 1 / -1;
+  padding-top: 0.55rem;
+  border-top: 1px dashed var(--border-strong);
+}
+
+.rateItem dt {
+  font-size: 0.73rem;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+}
+
+.rateItem dd {
+  font-family: var(--mono);
+  font-size: 0.83rem;
+}
+
+.rateDetail {
+  margin-top: 0.08rem;
+  font-family: var(--font);
+  font-size: 0.74rem;
+}
+
+.rateHint,
+.receiptHint,
+.waterfallHint {
+  min-width: 0;
+  margin: 0;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--primary-glow);
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.errorFeedback,
+.lossBanner {
+  border-color: var(--danger-glow);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.successFeedback {
+  border-color: var(--success-glow);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.optionalCostSection {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.toggleGrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.fixedFeeNote {
+  padding: 0.7rem 0.8rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: 0.79rem;
+}
+
+.actionRow {
+  justify-content: stretch;
+}
+
+.registerButton {
+  width: 100%;
+  min-width: 0;
+}
+
+.receiptContent {
+  gap: 0.9rem;
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.heroMetric {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-gradient);
+}
+
+.heroMetric.primaryMetric {
+  grid-column: auto;
+  padding: 0.95rem;
+  border-color: var(--primary-glow);
+  background: var(--primary-soft);
+}
+
+.heroMetric.secondaryMetric {
+  border-color: var(--success-glow);
+  background: var(--success-soft);
+}
+
+.heroValueRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.heroValue {
+  min-width: 0;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: clamp(1.05rem, 2vw, 1.55rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.primaryMetric .heroValue {
+  color: var(--primary);
+}
+
+.secondaryMetric .heroValue {
+  color: var(--success);
+}
+
+.profitabilitySummary {
+  margin: 0;
+}
+
+.profitabilityLegend {
+  font-size: 0.74rem;
+}
+
+.receiptSeparator {
+  border-top: 1px dashed var(--border-strong);
+}
+
+.resultGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.metricCard {
+  gap: 0.28rem;
+  padding: 0.72rem;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-gradient);
+}
+
+.metricLabel {
+  font-size: 0.74rem;
+  font-weight: 550;
+}
+
+.metricValue {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.metricDetail {
+  font-size: 0.74rem;
+}
+
+.positiveValue {
+  color: var(--success);
+}
+
+.negativeValue {
+  color: var(--danger);
+}
+
+.lossBanner {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+.waterfallCard {
+  min-width: 0;
+}
+
+@media (max-width: 1020px) {
+  .panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calculatorColumn,
+  .receiptColumn {
+    grid-column: 1;
+  }
+
+  .receiptColumn {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .entryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profileField {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 460px) {
+  .heroGrid,
+  .resultGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quickFact {
+    padding-right: 0.25rem;
+    padding-left: 0.25rem;
+    font-size: 0.66rem;
+  }
+}

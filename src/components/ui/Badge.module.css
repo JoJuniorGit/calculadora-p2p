@@ -1,12 +1,15 @@
 .badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
   max-width: 100%;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid transparent;
+  padding: 0.19rem 0.55rem;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 650;
+  font-size: 0.76rem;
+  font-weight: 680;
+  letter-spacing: 0.01em;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -18,21 +21,25 @@
 }
 
 .info {
+  border-color: var(--primary-glow);
   background: var(--primary-soft);
   color: var(--primary);
 }
 
 .success {
+  border-color: var(--success-glow);
   background: var(--success-soft);
   color: var(--success);
 }
 
 .warning {
+  border-color: var(--warning-glow);
   background: var(--warning-soft);
   color: var(--warning);
 }
 
 .danger {
+  border-color: var(--danger-glow);
   background: var(--danger-soft);
   color: var(--danger);
 }

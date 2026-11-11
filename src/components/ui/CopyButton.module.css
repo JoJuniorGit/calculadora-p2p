@@ -1,0 +1,57 @@
+.copyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  flex: 0 0 auto;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  color: var(--text-muted);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+
+.copyButton:hover:not(:disabled) {
+  border-color: var(--primary-glow);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.copyButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.copyButton.success {
+  border-color: var(--success-glow);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.copyButton.error {
+  border-color: var(--danger-glow);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.icon {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.feedback {
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.15;
+  white-space: nowrap;
+}

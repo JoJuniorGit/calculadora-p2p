@@ -12,11 +12,11 @@ import { formatBs, formatPct, formatRate, formatUsd } from '../../utils/format';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
-import { EmptyState } from '../../components/ui/EmptyState';
+import { CopyButton } from '../../components/ui/CopyButton';
+import { FilterChip } from '../../components/ui/FilterChip';
 import { NumberField } from '../../components/ui/NumberField';
 import { SelectField } from '../../components/ui/SelectField';
 import { TextField } from '../../components/ui/TextField';
-import { ToggleField } from '../../components/ui/ToggleField';
 import { WaterfallView } from './WaterfallView';
 import styles from './CalculatorPanel.module.css';
 
@@ -52,13 +52,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-function summarizeProfile(profile: BankProfile): string {
-  const cardBase = profile.cardCommissionBase === 'usd' ? 'USD' : 'Bs.S';
-  const toggleState = (enabled: boolean): string => (enabled ? 'activado' : 'desactivado');
-
-  return `Perfil ${profile.name}: comisión de tarjeta ${formatProfilePct(profile.cardCommissionPct)} sobre ${cardBase}; depósito Binance ${formatProfilePct(profile.binanceDepositPct)} + ${formatUsd(profile.binanceDepositFixedUsd)}. Por defecto, interbancario ${toggleState(profile.interbankEnabled)}, IGTF ${toggleState(profile.igtfEnabled)} y slippage ${toggleState(profile.slippageEnabled)}. Puedes ajustar estos interruptores solo para este cálculo.`;
-}
-
 function displayRate(value: number): string {
   return Number.isFinite(value) && value > 0 ? `${formatRate(value)} Bs.S/USD` : 'Sin configurar';
 }
@@ -69,6 +62,7 @@ export function CalculatorPanel() {
   const recordPurchase = useAppStore((state) => state.recordPurchase);
   const [mode, setMode] = useState<CalculationMode>('bs');
   const [amountText, setAmountText] = useState('');
+  const [amountTouched, setAmountTouched] = useState(false);
   const [profileId, setProfileId] = useState(() => profiles[0]?.id ?? '');
   const [options, setOptions] = useState<CalculationOptions>(() =>
     optionsFromProfile(profiles[0] ?? null),
@@ -161,6 +155,32 @@ export function CalculatorPanel() {
     selectedProfile,
   ]);
 
+  const referenceCalculation = useMemo<CalculationResult | null>(() => {
+    if (!selectedProfile || !ratesConfigured) return null;
+
+    const input: CalculationInput = {
+      mode,
+      amount: mode === 'bs' ? 1000 : 100,
+      bcvRate: rates.bcv.value,
+      binanceRate: rates.binance.value,
+      profile: selectedProfile,
+      options,
+    };
+
+    try {
+      return calculate(input);
+    } catch {
+      return null;
+    }
+  }, [
+    mode,
+    options,
+    rates.bcv.value,
+    rates.binance.value,
+    ratesConfigured,
+    selectedProfile,
+  ]);
+
   const calculationSignature =
     calculation.input && calculation.result ? JSON.stringify(calculation.input) : null;
   const alreadyRegistered =
@@ -216,17 +236,6 @@ export function CalculatorPanel() {
     }
   };
 
-  if (!selectedProfile) {
-    return (
-      <section className={styles.panel} aria-label="Calculadora de arbitraje">
-        <EmptyState
-          title="No hay perfiles bancarios configurados"
-          description="Crea un perfil bancario en la pestaña Perfiles antes de usar la calculadora."
-        />
-      </section>
-    );
-  }
-
   const amountHint = calculation.result
     ? mode === 'bs'
       ? `Equivalente estimado: ${formatUsd(calculation.result.usdBought)} acreditados en el banco antes de las comisiones de tarjeta.`
@@ -236,18 +245,46 @@ export function CalculatorPanel() {
       : 'Ingresa los USD que quieres solicitar; el monto en Bs.S se calcula automáticamente con la tasa BCV.';
 
   const result = calculation.result;
+  const referenceResult = result ? null : referenceCalculation;
+  const waterfallLines =
+    result?.waterfall ??
+    referenceResult?.waterfall.map((line) => ({
+      ...line,
+      amountBs: line.amountBs === null ? null : 0,
+      amountUsd: line.amountUsd === null ? null : 0,
+    })) ??
+    [];
+  const breakEvenRate = result?.breakEvenRate ?? referenceResult?.breakEvenRate;
+  const minGapPct = result?.minGapPct ?? referenceResult?.minGapPct;
+  const amountValue = amountText.trim() === '' ? Number.NaN : Number(amountText.replace(',', '.'));
+  const validAmount = Number.isFinite(amountValue) && amountValue > 0;
   const profitabilityTone =
     result?.profitability === 'green'
       ? 'success'
       : result?.profitability === 'yellow'
         ? 'warning'
-        : 'danger';
+        : result?.profitability === 'red'
+          ? 'danger'
+          : 'neutral';
   const profitabilityLabel =
     result?.profitability === 'green'
       ? 'Rentable'
       : result?.profitability === 'yellow'
         ? 'Margen bajo'
-        : 'No rentable';
+        : result?.profitability === 'red'
+          ? 'No rentable'
+          : !validAmount
+            ? 'Sin monto'
+            : !selectedProfile
+              ? 'Sin perfil'
+              : !calculation.ratesConfigured
+                ? 'Sin tasas'
+                : 'Sin cálculo';
+  const waterfallHint = !selectedProfile
+    ? 'Crea un perfil bancario para generar el desglose.'
+    : !calculation.ratesConfigured
+      ? 'Configura las tasas BCV y Binance P2P para ver el desglose.'
+      : 'No fue posible generar el desglose con la configuración actual.';
 
   return (
     <section className={styles.panel} aria-label="Calculadora de arbitraje">
@@ -260,160 +297,231 @@ export function CalculatorPanel() {
         </div>
       )}
 
-      <Card title="Calculadora P2P" className={styles.calculatorCard}>
-        <div className={styles.formContent}>
-          <div className={styles.entryGrid}>
-            <div className={styles.modeField}>
-              <span className={styles.fieldLabel}>Modo de entrada</span>
-              <div className={styles.modeSelector} role="group" aria-label="Modo de cálculo">
-                <button
-                  className={`${styles.modeButton} ${mode === 'bs' ? styles.modeButtonActive : ''}`}
-                  type="button"
-                  aria-pressed={mode === 'bs'}
-                  onClick={() => {
-                    if (mode === 'bs') return;
-                    clearFeedback();
-                    setMode('bs');
-                  }}
-                >
-                  Invertir Bs.S
-                </button>
-                <button
-                  className={`${styles.modeButton} ${mode === 'usd' ? styles.modeButtonActive : ''}`}
-                  type="button"
-                  aria-pressed={mode === 'usd'}
-                  onClick={() => {
-                    if (mode === 'usd') return;
-                    clearFeedback();
-                    setMode('usd');
-                  }}
-                >
-                  Solicitar USD
-                </button>
+      <div className={styles.calculatorColumn}>
+        <Card title="Calculadora P2P" className={styles.calculatorCard}>
+          <div className={styles.formContent}>
+            <div className={styles.entryGrid}>
+              <div className={styles.modeField}>
+                <span className={styles.fieldLabel}>Modo de entrada</span>
+                <div className={styles.modeSelector} role="group" aria-label="Modo de cálculo">
+                  <button
+                    className={`${styles.modeButton} ${mode === 'bs' ? styles.modeButtonActive : ''}`}
+                    type="button"
+                    aria-pressed={mode === 'bs'}
+                    onClick={() => {
+                      if (mode === 'bs') return;
+                      clearFeedback();
+                      setMode('bs');
+                    }}
+                  >
+                    Invertir Bs.S
+                  </button>
+                  <button
+                    className={`${styles.modeButton} ${mode === 'usd' ? styles.modeButtonActive : ''}`}
+                    type="button"
+                    aria-pressed={mode === 'usd'}
+                    onClick={() => {
+                      if (mode === 'usd') return;
+                      clearFeedback();
+                      setMode('usd');
+                    }}
+                  >
+                    Solicitar USD
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <NumberField
-              label={mode === 'bs' ? 'Monto a invertir' : 'Monto de USD a solicitar'}
-              name="calculator-amount"
-              value={amountText}
-              onChange={(value) => {
-                clearFeedback();
-                setAmountText(value);
-              }}
-              suffix={mode === 'bs' ? 'Bs.S' : 'USD'}
-              step="any"
-              placeholder={mode === 'bs' ? 'Ej.: 2500,00' : 'Ej.: 100,00'}
-              error={calculation.amountError}
-              hint={amountHint}
-            />
-
-            <div className={styles.profileField}>
-              <SelectField
-                label="Perfil bancario"
-                name="calculator-profile"
-                value={selectedProfile.id}
-                onChange={handleProfileChange}
-                options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))}
-                hint={summarizeProfile(selectedProfile)}
+              <NumberField
+                label={mode === 'bs' ? 'Monto a invertir' : 'Monto de USD a solicitar'}
+                name="calculator-amount"
+                value={amountText}
+                onChange={(value) => {
+                  clearFeedback();
+                  setAmountText(value);
+                  setAmountTouched(true);
+                }}
+                suffix={mode === 'bs' ? 'Bs.S' : 'USD'}
+                step="any"
+                placeholder={mode === 'bs' ? 'Ej.: 2500,00' : 'Ej.: 100,00'}
+                error={amountTouched ? calculation.amountError : undefined}
+                hint={amountHint}
               />
-            </div>
-          </div>
 
-          <dl className={styles.rateSummary} aria-label="Tasas actuales">
-            <div className={styles.rateItem}>
-              <dt>Tasa BCV</dt>
-              <dd>{displayRate(rates.bcv.value)}</dd>
+              {selectedProfile ? (
+                <div className={styles.profileField}>
+                  <SelectField
+                    label="Perfil bancario"
+                    name="calculator-profile"
+                    value={selectedProfile.id}
+                    onChange={handleProfileChange}
+                    options={profiles.map((profile) => ({ value: profile.id, label: profile.name }))}
+                  />
+                  <div className={styles.profileQuickFacts} aria-label="Resumen del perfil bancario">
+                    <span
+                      className={styles.quickFact}
+                      title={`Comisión de tarjeta sobre ${selectedProfile.cardCommissionBase === 'usd' ? 'USD' : 'Bs.S'}`}
+                    >
+                      Tarjeta: {formatProfilePct(selectedProfile.cardCommissionPct)}
+                    </span>
+                    <span className={styles.quickFact} title="Comisión de depósito Binance">
+                      Binance: {formatProfilePct(selectedProfile.binanceDepositPct)} +{' '}
+                      {formatUsd(selectedProfile.binanceDepositFixedUsd)}
+                    </span>
+                    <span className={styles.quickFact} title="Costo interbancario predeterminado">
+                      Interbancario:{' '}
+                      {selectedProfile.interbankEnabled
+                        ? formatProfilePct(selectedProfile.interbankPct)
+                        : 'off'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className={styles.rateHint} role="note">
+                  No hay perfiles bancarios configurados. Crea uno en la pestaña Perfiles para registrar una operación.
+                </p>
+              )}
             </div>
-            <div className={styles.rateItem}>
-              <dt>Binance P2P</dt>
-              <dd>{displayRate(rates.binance.value)}</dd>
-            </div>
-            {exchangeGap && (
+
+            <dl className={styles.rateSummary} aria-label="Tasas actuales">
               <div className={styles.rateItem}>
-                <dt>Brecha actual (vs BCV + 0,50%)</dt>
-                <dd>
-                  {formatPct(exchangeGap.pct, 2)}
-                  <span className={styles.rateDetail}>({formatRate(exchangeGap.absoluteBs)} Bs.S)</span>
-                </dd>
+                <dt>Tasa BCV</dt>
+                <dd>{displayRate(rates.bcv.value)}</dd>
+              </div>
+              <div className={styles.rateItem}>
+                <dt>Binance P2P</dt>
+                <dd>{displayRate(rates.binance.value)}</dd>
+              </div>
+              {exchangeGap && (
+                <div className={`${styles.rateItem} ${styles.rateItemFull}`}>
+                  <dt>Brecha actual (vs BCV + 0,50%)</dt>
+                  <dd>
+                    {formatPct(exchangeGap.pct, 2)}
+                    <span className={styles.rateDetail}>
+                      ({formatRate(exchangeGap.absoluteBs)} Bs.S)
+                    </span>
+                  </dd>
+                </div>
+              )}
+            </dl>
+
+            {!calculation.ratesConfigured && (
+              <p className={styles.rateHint} role="note">
+                {RATE_CONFIGURATION_HINT}
+              </p>
+            )}
+            {calculation.engineError && (
+              <p className={styles.errorFeedback} role="alert">
+                {calculation.engineError}
+              </p>
+            )}
+
+            {selectedProfile && (
+              <div className={styles.optionalCostSection}>
+                <span className={styles.fieldLabel}>Costos opcionales para este cálculo</span>
+                <div className={styles.toggleGrid}>
+                  <FilterChip
+                    label={`Interbancario ${formatProfilePct(selectedProfile.interbankPct)}`}
+                    active={options.interbankEnabled}
+                    title="Alterna el costo interbancario para este cálculo"
+                    onToggle={() => {
+                      clearFeedback();
+                      setOptions((current) => ({
+                        ...current,
+                        interbankEnabled: !current.interbankEnabled,
+                      }));
+                    }}
+                  />
+                  <FilterChip
+                    label={`IGTF ${formatProfilePct(selectedProfile.igtfPct)}`}
+                    active={options.igtfEnabled}
+                    title="Alterna el IGTF para este cálculo"
+                    onToggle={() => {
+                      clearFeedback();
+                      setOptions((current) => ({ ...current, igtfEnabled: !current.igtfEnabled }));
+                    }}
+                  />
+                  <FilterChip
+                    label={`Slippage ${formatProfilePct(selectedProfile.slippagePct)}`}
+                    active={options.slippageEnabled}
+                    title="Alterna el slippage para este cálculo"
+                    onToggle={() => {
+                      clearFeedback();
+                      setOptions((current) => ({
+                        ...current,
+                        slippageEnabled: !current.slippageEnabled,
+                      }));
+                    }}
+                  />
+                </div>
               </div>
             )}
-          </dl>
 
-          {!calculation.ratesConfigured && (
-            <p className={styles.rateHint} role="note">
-              {RATE_CONFIGURATION_HINT}
+            <p className={styles.fixedFeeNote}>
+              La comisión por intervención es fija: 0,50% del monto en Bs.S (no editable).
             </p>
-          )}
-          {calculation.engineError && (
-            <p className={styles.errorFeedback} role="alert">
-              {calculation.engineError}
-            </p>
-          )}
 
-          <div className={styles.toggleGrid}>
-            <ToggleField
-              label={`Costo interbancario (${formatProfilePct(selectedProfile.interbankPct)})`}
-              checked={options.interbankEnabled}
-              onChange={(checked) => {
+            <TextField
+              label="Notas de la compra (opcional)"
+              name="calculator-notes"
+              value={notes}
+              onChange={(value) => {
                 clearFeedback();
-                setOptions((current) => ({ ...current, interbankEnabled: checked }));
+                setNotes(value);
               }}
+              placeholder="Agrega una referencia para este registro"
             />
-            <ToggleField
-              label={`IGTF (${formatProfilePct(selectedProfile.igtfPct)})`}
-              checked={options.igtfEnabled}
-              onChange={(checked) => {
-                clearFeedback();
-                setOptions((current) => ({ ...current, igtfEnabled: checked }));
-              }}
-            />
-            <ToggleField
-              label={`Slippage (${formatProfilePct(selectedProfile.slippagePct)})`}
-              checked={options.slippageEnabled}
-              onChange={(checked) => {
-                clearFeedback();
-                setOptions((current) => ({ ...current, slippageEnabled: checked }));
-              }}
-            />
-          </div>
 
-          <p className={styles.fixedFeeNote}>
-            La comisión por intervención es fija: 0,50% del monto en Bs.S (no editable).
-          </p>
-
-          <TextField
-            label="Notas de la compra (opcional)"
-            name="calculator-notes"
-            value={notes}
-            onChange={(value) => {
-              clearFeedback();
-              setNotes(value);
-            }}
-            placeholder="Agrega una referencia para este registro"
-          />
-
-          <div className={styles.actionRow}>
-            <Button
-              className={styles.registerButton}
-              onClick={handleRegister}
-              disabled={!calculation.input || !result || alreadyRegistered}
-            >
-              Registrar compra
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {result && (
-        <>
-          {result.netProfitBs < 0 && (
-            <div className={styles.lossBanner} role="alert">
-              La utilidad neta es negativa: la operación perdería {formatBs(Math.abs(result.netProfitBs))} con estas tasas y comisiones. Verifica el break-even antes de operar.
+            <div className={styles.actionRow}>
+              <Button
+                className={styles.registerButton}
+                onClick={handleRegister}
+                disabled={!calculation.input || !result || alreadyRegistered}
+              >
+                Registrar compra
+              </Button>
             </div>
-          )}
+          </div>
+        </Card>
+      </div>
 
-          <Card title="Resultado de la operación" className={styles.resultsCard}>
+      <div className={styles.receiptColumn}>
+        <Card title="Resultado de la operación" className={styles.resultsCard}>
+          <div className={styles.receiptContent}>
+            {!calculation.ratesConfigured && (
+              <p className={styles.receiptHint} role="note">
+                Configura ambas tasas para calcular resultados y break-even.
+              </p>
+            )}
+
+            <div className={styles.heroGrid}>
+              <article className={`${styles.heroMetric} ${styles.primaryMetric}`}>
+                <span className={styles.metricLabel}>Monto exacto a digitar en Binance</span>
+                <div className={styles.heroValueRow}>
+                  <strong className={styles.heroValue} data-testid="binance-amount">
+                    {formatUsd(result?.usdForBinance ?? 0)}
+                  </strong>
+                  <CopyButton
+                    value={(result?.usdForBinance ?? 0).toFixed(2)}
+                    label="monto de Binance"
+                    disabled={!result}
+                  />
+                </div>
+              </article>
+              <article className={`${styles.heroMetric} ${styles.secondaryMetric}`}>
+                <span className={styles.metricLabel}>Bs.S a recibir</span>
+                <div className={styles.heroValueRow}>
+                  <strong className={styles.heroValue}>
+                    {formatBs(result?.bsOut ?? 0)}
+                  </strong>
+                  <CopyButton
+                    value={(result?.bsOut ?? 0).toFixed(2)}
+                    label="monto en Bs.S a recibir"
+                    disabled={!result}
+                  />
+                </div>
+              </article>
+            </div>
+
             <div className={styles.profitabilitySummary}>
               <span className={styles.trafficLight} data-testid="traffic-light">
                 <Badge tone={profitabilityTone}>{profitabilityLabel}</Badge>
@@ -423,53 +531,61 @@ export function CalculatorPanel() {
               </p>
             </div>
 
+            <div className={styles.receiptSeparator} aria-hidden="true" />
+
             <div className={styles.resultGrid}>
-              <article className={`${styles.metricCard} ${styles.primaryMetric}`}>
-                <span className={styles.metricLabel}>Monto exacto a digitar en Binance</span>
-                <strong className={styles.metricValue} data-testid="binance-amount">
-                  {formatUsd(result.usdForBinance)}
-                </strong>
-              </article>
               <article className={styles.metricCard}>
-                <span className={styles.metricLabel}>
-                  Punto de equilibrio (tasa mínima de venta)
-                </span>
+                <span className={styles.metricLabel}>Punto de equilibrio (tasa mínima de venta)</span>
                 <strong className={styles.metricValue} data-testid="break-even-rate">
-                  {formatRate(result.breakEvenRate)} Bs.S/USD
+                  {breakEvenRate === undefined ? '—' : `${formatRate(breakEvenRate)} Bs.S/USD`}
                 </strong>
               </article>
               <article className={styles.metricCard}>
                 <span className={styles.metricLabel}>Brecha mínima requerida</span>
                 <strong className={styles.metricValue} data-testid="min-gap">
-                  {formatPct(result.minGapPct)}
+                  {minGapPct === undefined ? '—' : formatPct(minGapPct, 2)}
                 </strong>
-              </article>
-              <article className={styles.metricCard}>
-                <span className={styles.metricLabel}>Costo total real</span>
-                <strong className={styles.metricValue}>{formatBs(result.totalCostBs)}</strong>
               </article>
               <article className={styles.metricCard}>
                 <span className={styles.metricLabel}>Utilidad neta</span>
                 <strong
-                  className={`${styles.metricValue} ${result.netProfitBs < 0 ? styles.negativeValue : styles.positiveValue}`}
+                  className={`${styles.metricValue} ${result ? (result.netProfitBs < 0 ? styles.negativeValue : styles.positiveValue) : ''}`}
                   data-testid="net-profit"
                 >
-                  {formatBs(result.netProfitBs)}
+                  {formatBs(result?.netProfitBs ?? 0)}
                 </strong>
-                <span className={styles.metricDetail}>ROI: {formatPct(result.roiPct)}</span>
+                <span className={styles.metricDetail}>ROI: {formatPct(result?.roiPct ?? 0, 2)}</span>
+              </article>
+              <article className={styles.metricCard}>
+                <span className={styles.metricLabel}>Costo total real</span>
+                <strong className={styles.metricValue}>{formatBs(result?.totalCostBs ?? 0)}</strong>
               </article>
               <article className={styles.metricCard}>
                 <span className={styles.metricLabel}>USDT netos en billetera</span>
-                <strong className={styles.metricValue}>{formatUsd(result.usdDeposited)}</strong>
+                <strong className={styles.metricValue}>{formatUsd(result?.usdDeposited ?? 0)}</strong>
               </article>
             </div>
-          </Card>
 
-          <Card title="Desglose del cálculo (waterfall)" className={styles.waterfallCard}>
-            <WaterfallView lines={result.waterfall} />
-          </Card>
-        </>
-      )}
+            {result && result.netProfitBs < 0 && (
+              <div className={styles.lossBanner} role="alert">
+                La utilidad neta es negativa: la operación perdería{' '}
+                {formatBs(Math.abs(result.netProfitBs))} con estas tasas y comisiones. Verifica el
+                break-even antes de operar.
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <Card title="Desglose del cálculo (waterfall)" className={styles.waterfallCard}>
+          {waterfallLines.length > 0 ? (
+            <WaterfallView lines={waterfallLines} />
+          ) : (
+            <p className={styles.waterfallHint} role="note">
+              {waterfallHint}
+            </p>
+          )}
+        </Card>
+      </div>
     </section>
   );
 }

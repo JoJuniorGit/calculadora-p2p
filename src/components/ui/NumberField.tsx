@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import styles from './fields.module.css';
 
 export interface NumberFieldProps {
@@ -11,6 +11,7 @@ export interface NumberFieldProps {
   placeholder?: string;
   name?: string;
   suffix?: string;
+  action?: ReactNode;
   step?: number | 'any';
 }
 
@@ -24,6 +25,7 @@ export function NumberField({
   placeholder,
   name,
   suffix,
+  action,
   step,
 }: NumberFieldProps) {
   const fieldId = useId();
@@ -33,13 +35,24 @@ export function NumberField({
   const normalizedValue = value.trim().replace(',', '.');
   const numericValue = normalizedValue === '' ? Number.NaN : Number(normalizedValue);
   const stepValue = step === 'any' ? undefined : step ?? 1;
+  const adornmentClassName =
+    suffix && action
+      ? styles.inputWithSuffixAndAction
+      : suffix
+        ? styles.inputWithSuffix
+        : action
+          ? styles.inputWithAction
+          : undefined;
+  const wrapperClassName = [adornmentClassName, disabled ? styles.adornmentDisabled : undefined]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className={styles.field}>
       <label className={styles.label} htmlFor={fieldId}>
         {label}
       </label>
-      <div className={suffix ? styles.inputWithSuffix : undefined}>
+      <div className={wrapperClassName || undefined}>
         <input
           id={fieldId}
           name={name}
@@ -68,6 +81,7 @@ export function NumberField({
           aria-valuenow={Number.isFinite(numericValue) ? numericValue : undefined}
         />
         {suffix && <span className={styles.suffix}>{suffix}</span>}
+        {action && <span className={styles.inputAction}>{action}</span>}
       </div>
       {hint && (
         <p id={hintId} className={styles.hint}>

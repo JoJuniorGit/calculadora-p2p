@@ -25,6 +25,10 @@
   background: var(--bg-elevated);
   color: var(--text);
   line-height: 1.4;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .input::placeholder,
@@ -37,6 +41,8 @@
 .select:focus-visible,
 .textarea:focus-visible {
   border-color: var(--primary);
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .input:disabled,
@@ -63,7 +69,21 @@
   min-width: 0;
 }
 
-.inputWithSuffix .input {
+.inputWithAction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.inputWithSuffixAndAction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-width: 0;
+}
+
+.inputWithSuffix .input,
+.inputWithAction .input,
+.inputWithSuffixAndAction .input {
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 
@@ -80,6 +100,34 @@
   color: var(--text-muted);
   font-size: 0.86rem;
   white-space: nowrap;
+}
+
+.inputWithSuffixAndAction .suffix {
+  border-right: 0;
+  border-radius: 0;
+}
+
+.inputAction {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-left: 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bg-subtle);
+}
+
+.inputAction > button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  box-shadow: none;
+}
+
+.adornmentDisabled .suffix,
+.adornmentDisabled .inputAction {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .hint,
