@@ -69,4 +69,4 @@ Out of scope: changing the status machine order, recalculating already-completed
 ## Commit log
 
 - `d5d2dc3` feat(accreditation): add partial accreditation domain and store flow.
-- Pending UI work-unit commit.
+- `ee14cbe` feat(records): add partial accreditation modal and badges.
