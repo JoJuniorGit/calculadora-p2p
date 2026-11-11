@@ -61,6 +61,14 @@ function createPurchase(
     estimatedProfitBs: 100,
     estimatedRoiPct: 10,
     breakEvenRate: 1_000 / 24.13,
+    requestedInvestmentVes: 1_000,
+    requestedUsd: 24.88,
+    accreditationType: 'TOTAL',
+    accreditedUsd: 24.88,
+    accreditationRatePercent: 100,
+    executedInvestmentVes: 1_000,
+    refundedVes: 0,
+    accreditationConfirmedAt: null,
     status,
     statusHistory: [],
     execution: null,
@@ -106,6 +114,17 @@ describe('computeKpis', () => {
       completedCount: 2,
       cancelledCount: 1,
     });
+  });
+
+  it('uses the executed out-of-pocket total after a partial accreditation', () => {
+    const partial = createPurchase('partial', 'usd_credited', {
+      requestedInvestmentVes: 10_000,
+      executedInvestmentVes: 4_000,
+      refundedVes: 6_000,
+      totalCostBs: 4_000,
+    });
+
+    expect(computeKpis([partial]).inTransitCapitalBs).toBe(4_000);
   });
 
   it('returns zeroed KPIs for an empty list', () => {

@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { calculate } from '../domain/calculations';
+import { calculate, round2 } from '../domain/calculations';
+import { computeKpis } from '../domain/kpis';
 import type {
   BankProfile,
   CalculationInput,
@@ -78,6 +79,14 @@ function createPurchase(id = 'purchase-1', overrides: Partial<PurchaseRecord> = 
     estimatedProfitBs: result.netProfitBs,
     estimatedRoiPct: result.roiPct,
     breakEvenRate: result.breakEvenRate,
+    requestedInvestmentVes: result.amountBs,
+    requestedUsd: result.usdBought,
+    accreditationType: 'TOTAL',
+    accreditedUsd: result.usdBought,
+    accreditationRatePercent: 100,
+    executedInvestmentVes: result.amountBs,
+    refundedVes: 0,
+    accreditationConfirmedAt: null,
     status: 'pending',
     statusHistory: [],
     execution: null,
@@ -166,6 +175,83 @@ describe('useAppStore purchase actions', () => {
       toStatus: 'completed',
       note: `Venta real a ${formatRate(46.5)} Bs.S/USD`,
     });
+  });
+
+  it('accredits a pending purchase partially while preserving the original request', () => {
+    const record = useAppStore.getState().recordPurchase(createInput());
+    const half = round2(record.requestedUsd / 2);
+    const updated = useAppStore.getState().accreditPurchase(record.id, {
+      accreditationType: 'PARTIAL',
+      accreditedUsd: half,
+      keepInterbankSunk: false,
+      note: 'Corte de mesa de cambio',
+    });
+
+    expect(updated.status).toBe('usd_credited');
+    expect(updated.requestedInvestmentVes).toBe(record.requestedInvestmentVes);
+    expect(updated.requestedUsd).toBe(record.requestedUsd);
+    expect(updated.accreditationType).toBe('PARTIAL');
+    expect(updated.accreditedUsd).toBe(half);
+    expect(updated.executedInvestmentVes).toBe(updated.amountBs);
+    expect(updated.amountBs).toBeLessThan(record.amountBs);
+    expect(updated.refundedVes).toBe(
+      round2(record.requestedInvestmentVes - updated.amountBs),
+    );
+    expect(updated.accreditationConfirmedAt).toBeTruthy();
+    expect(updated.statusHistory[1].note).toContain('Acreditación parcial');
+    expect(updated.statusHistory[1].note).toContain('Corte de mesa de cambio');
+    expect(updated.statusHistory[1].metadata).toMatchObject({
+      accreditationType: 'PARTIAL',
+      keepInterbankSunk: false,
+      accreditedUsd: half,
+    });
+    expect(computeKpis(useAppStore.getState().purchases).inTransitCapitalBs).toBe(
+      updated.totalCostBs,
+    );
+  });
+
+  it('keeps the original values when the accreditation is total', () => {
+    const record = useAppStore.getState().recordPurchase(createInput());
+    const updated = useAppStore.getState().accreditPurchase(record.id, {
+      accreditationType: 'TOTAL',
+      accreditedUsd: record.requestedUsd,
+      keepInterbankSunk: true,
+    });
+
+    expect(updated.amountBs).toBe(record.amountBs);
+    expect(updated.usdDeposited).toBe(record.usdDeposited);
+    expect(updated.totalCostBs).toBe(record.totalCostBs);
+    expect(updated.refundedVes).toBe(0);
+    expect(updated.accreditationRatePercent).toBe(100);
+    expect(updated.accreditationConfirmedAt).toBeTruthy();
+    expect(updated.statusHistory[1].note).toContain('Acreditación total');
+  });
+
+  it('rejects invalid or repeated accreditation requests', () => {
+    const record = useAppStore.getState().recordPurchase(createInput());
+    const request = {
+      accreditationType: 'PARTIAL' as const,
+      accreditedUsd: round2(record.requestedUsd / 2),
+      keepInterbankSunk: false,
+    };
+
+    expect(() =>
+      useAppStore.getState().accreditPurchase(record.id, {
+        ...request,
+        accreditedUsd: 0,
+      }),
+    ).toThrow('Los USD acreditados deben ser mayores que 0');
+    expect(() =>
+      useAppStore.getState().accreditPurchase(record.id, {
+        ...request,
+        accreditedUsd: record.requestedUsd + 1,
+      }),
+    ).toThrow('Los USD acreditados no pueden superar los USD solicitados');
+
+    useAppStore.getState().accreditPurchase(record.id, request);
+    expect(() => useAppStore.getState().accreditPurchase(record.id, request)).toThrow(
+      'Solo las compras pendientes pueden registrar una acreditación',
+    );
   });
 
   it('rejects an unknown purchase and completion without a valid sale rate', () => {

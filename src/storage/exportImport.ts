@@ -2,15 +2,17 @@ import type { PersistedState, PurchaseRecord } from '../domain/types';
 import {
   configExportSchema,
   formatZodIssues,
+  normalizePurchasesPayload,
   purchaseRecordSchema,
   purchasesExportSchema,
+  withLegacyAccreditationDefaults,
 } from '../domain/validation';
 
 const SCHEMA_VERSION = 1;
 
 export type ImportResult<T> = { ok: true; data: T } | { ok: false; errors: string[] };
 
-const purchaseCsvColumns = [
+const legacyPurchaseCsvColumns = [
   'id',
   'createdAt',
   'profileId',
@@ -33,6 +35,22 @@ const purchaseCsvColumns = [
   'execution',
   'statusHistory',
   'snapshot',
+] as const;
+
+const accreditationCsvColumns = [
+  'requestedInvestmentVes',
+  'requestedUsd',
+  'accreditationType',
+  'accreditedUsd',
+  'accreditationRatePercent',
+  'executedInvestmentVes',
+  'refundedVes',
+  'accreditationConfirmedAt',
+] as const;
+
+const purchaseCsvColumns = [
+  ...legacyPurchaseCsvColumns,
+  ...accreditationCsvColumns,
 ] as const;
 
 type PurchaseCsvColumn = (typeof purchaseCsvColumns)[number];
@@ -72,7 +90,9 @@ function validatePurchaseArray(records: unknown[]): ImportResult<PurchaseRecord[
   const errors: string[] = [];
 
   records.forEach((record, index) => {
-    const parsed = purchaseRecordSchema.safeParse(record);
+    const parsed = purchaseRecordSchema.safeParse(
+      withLegacyAccreditationDefaults(record),
+    );
     if (parsed.success) {
       purchases.push(parsed.data);
       return;
@@ -224,21 +244,24 @@ function csvNumber(value: string): number {
   return value.trim() === '' ? Number.NaN : Number(value);
 }
 
-function parseCsvPurchase(fields: string[], rowLine: number): PurchaseRecord {
+function parseCsvPurchase(
+  fields: string[],
+  rowLine: number,
+  columns: readonly PurchaseCsvColumn[],
+): unknown {
   const values = Object.fromEntries(
-    purchaseCsvColumns.map((column, index) => [column, fields[index]]),
-  ) as Record<PurchaseCsvColumn, string>;
+    columns.map((column, index) => [column, fields[index]]),
+  ) as Record<string, string>;
   const execution =
     values.execution === ''
       ? null
       : parseJsonColumn(values.execution, 'execution', rowLine);
-
-  return {
+  const candidate: Record<string, unknown> = {
     id: values.id,
     createdAt: values.createdAt,
     profileId: values.profileId,
     profileName: values.profileName,
-    mode: values.mode as PurchaseRecord['mode'],
+    mode: values.mode,
     inputAmount: csvNumber(values.inputAmount),
     amountBs: csvNumber(values.amountBs),
     bcvRate: csvNumber(values.bcvRate),
@@ -251,12 +274,26 @@ function parseCsvPurchase(fields: string[], rowLine: number): PurchaseRecord {
     estimatedProfitBs: csvNumber(values.estimatedProfitBs),
     estimatedRoiPct: csvNumber(values.estimatedRoiPct),
     breakEvenRate: csvNumber(values.breakEvenRate),
-    status: values.status as PurchaseRecord['status'],
+    status: values.status,
     notes: values.notes,
     execution,
     statusHistory: parseJsonColumn(values.statusHistory, 'statusHistory', rowLine),
     snapshot: parseJsonColumn(values.snapshot, 'snapshot', rowLine),
-  } as PurchaseRecord;
+  };
+
+  if (values.requestedInvestmentVes !== undefined) {
+    candidate.requestedInvestmentVes = csvNumber(values.requestedInvestmentVes);
+    candidate.requestedUsd = csvNumber(values.requestedUsd);
+    candidate.accreditationType = values.accreditationType;
+    candidate.accreditedUsd = csvNumber(values.accreditedUsd);
+    candidate.accreditationRatePercent = csvNumber(values.accreditationRatePercent);
+    candidate.executedInvestmentVes = csvNumber(values.executedInvestmentVes);
+    candidate.refundedVes = csvNumber(values.refundedVes);
+    candidate.accreditationConfirmedAt =
+      values.accreditationConfirmedAt === '' ? null : values.accreditationConfirmedAt;
+  }
+
+  return candidate;
 }
 
 export function createPurchasesJsonExport(purchases: PurchaseRecord[]): string {
@@ -277,7 +314,7 @@ export function parsePurchasesJson(text: string): ImportResult<PurchaseRecord[]>
 
   if (Array.isArray(payload)) return validatePurchaseArray(payload);
 
-  const parsed = purchasesExportSchema.safeParse(payload);
+  const parsed = purchasesExportSchema.safeParse(normalizePurchasesPayload(payload));
   if (!parsed.success) {
     return { ok: false, errors: formatPurchaseExportIssues(parsed.error) };
   }
@@ -311,6 +348,14 @@ export function createPurchasesCsvExport(purchases: PurchaseRecord[]): string {
       execution: purchase.execution === null ? '' : JSON.stringify(purchase.execution),
       statusHistory: JSON.stringify(purchase.statusHistory),
       snapshot: JSON.stringify(purchase.snapshot),
+      requestedInvestmentVes: String(purchase.requestedInvestmentVes),
+      requestedUsd: String(purchase.requestedUsd),
+      accreditationType: purchase.accreditationType,
+      accreditedUsd: String(purchase.accreditedUsd),
+      accreditationRatePercent: String(purchase.accreditationRatePercent),
+      executedInvestmentVes: String(purchase.executedInvestmentVes),
+      refundedVes: String(purchase.refundedVes),
+      accreditationConfirmedAt: purchase.accreditationConfirmedAt ?? '',
     };
 
     return purchaseCsvColumns.map((column) => escapeCsvField(values[column])).join(',');
@@ -330,33 +375,39 @@ export function parsePurchasesCsv(text: string): ImportResult<PurchaseRecord[]> 
   const header = rows[0];
   if (!header) return { ok: false, errors: ['El archivo CSV está vacío o no contiene encabezado.'] };
 
-  const hasExpectedHeader =
+  const hasLegacyHeader =
+    header.fields.length === legacyPurchaseCsvColumns.length &&
+    legacyPurchaseCsvColumns.every((column, index) => header.fields[index] === column);
+  const hasCurrentHeader =
     header.fields.length === purchaseCsvColumns.length &&
     purchaseCsvColumns.every((column, index) => header.fields[index] === column);
-  if (!hasExpectedHeader) {
+  if (!hasLegacyHeader && !hasCurrentHeader) {
     return { ok: false, errors: [`Fila ${header.line}: el encabezado CSV no es válido.`] };
   }
 
+  const columns = hasCurrentHeader ? purchaseCsvColumns : legacyPurchaseCsvColumns;
   const purchases: PurchaseRecord[] = [];
   const errors: string[] = [];
 
   for (const row of rows.slice(1)) {
-    if (row.fields.length !== purchaseCsvColumns.length) {
+    if (row.fields.length !== columns.length) {
       errors.push(
-        `Fila ${row.line}: se esperaban ${purchaseCsvColumns.length} columnas y se encontraron ${row.fields.length}.`,
+        `Fila ${row.line}: se esperaban ${columns.length} columnas y se encontraron ${row.fields.length}.`,
       );
       continue;
     }
 
-    let candidate: PurchaseRecord;
+    let candidate: unknown;
     try {
-      candidate = parseCsvPurchase(row.fields, row.line);
+      candidate = parseCsvPurchase(row.fields, row.line, columns);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : `Fila ${row.line}: error al leer la fila.`);
       continue;
     }
 
-    const parsed = purchaseRecordSchema.safeParse(candidate);
+    const parsed = purchaseRecordSchema.safeParse(
+      withLegacyAccreditationDefaults(candidate),
+    );
     if (!parsed.success) {
       errors.push(`Fila ${row.line}: ${formatZodIssues(parsed.error).join('; ')}`);
       continue;
@@ -384,7 +435,7 @@ export function parseConfigJson(text: string): ImportResult<PersistedState> {
     return jsonError();
   }
 
-  const parsed = configExportSchema.safeParse(payload);
+  const parsed = configExportSchema.safeParse(normalizePurchasesPayload(payload));
   if (!parsed.success) {
     if (
       typeof payload === 'object' &&

@@ -159,12 +159,26 @@ export type PurchaseStatus =
   | 'completed'
   | 'cancelled';
 
+export type AccreditationType = 'TOTAL' | 'PARTIAL';
+
+export interface StatusChangeMetadata {
+  accreditationType?: AccreditationType;
+  requestedInvestmentVes?: number;
+  requestedUsd?: number;
+  accreditedUsd?: number;
+  accreditationRatePercent?: number;
+  executedInvestmentVes?: number;
+  refundedVes?: number;
+  keepInterbankSunk?: boolean;
+}
+
 export interface StatusChange {
   id: string;
   timestamp: string;
   fromStatus: PurchaseStatus | null;
   toStatus: PurchaseStatus;
   note: string;
+  metadata?: StatusChangeMetadata;
 }
 
 export interface PurchaseExecution {
@@ -183,10 +197,12 @@ export interface PurchaseRecord {
   profileName: string;
   mode: CalculationMode;
   inputAmount: number;
+  /** Executed Bs.S debited by the bank (updated after a partial accreditation). */
   amountBs: number;
   bcvRate: number;
   binanceRate: number;
   snapshot: CalculationSnapshot;
+  /** Executed USD bought at the bank (updated after a partial accreditation). */
   usdBought: number;
   usdForBinance: number;
   usdDeposited: number;
@@ -195,6 +211,20 @@ export interface PurchaseRecord {
   estimatedProfitBs: number;
   estimatedRoiPct: number;
   breakEvenRate: number;
+  /** Immutable Bs.S committed when the purchase was registered. */
+  requestedInvestmentVes: number;
+  /** Immutable USD originally requested from the bank (USD_1 theoretical). */
+  requestedUsd: number;
+  accreditationType: AccreditationType;
+  /** USD actually approved by the bank on the confirmed accreditation. */
+  accreditedUsd: number;
+  accreditationRatePercent: number;
+  /** Bs.S actually debited by the bank, including the intervention fee. */
+  executedInvestmentVes: number;
+  /** Bs.S released back to the current account by the bank. */
+  refundedVes: number;
+  /** ISO timestamp of the confirmed accreditation; null while pending. */
+  accreditationConfirmedAt: string | null;
   status: PurchaseStatus;
   statusHistory: StatusChange[];
   /** Real sale results, present only when the purchase reached `completed`. */

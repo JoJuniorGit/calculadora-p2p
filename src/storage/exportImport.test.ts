@@ -82,6 +82,14 @@ function createPurchase(
     estimatedProfitBs: result.netProfitBs,
     estimatedRoiPct: result.roiPct,
     breakEvenRate: result.breakEvenRate,
+    requestedInvestmentVes: result.amountBs,
+    requestedUsd: result.usdBought,
+    accreditationType: 'TOTAL',
+    accreditedUsd: result.usdBought,
+    accreditationRatePercent: 100,
+    executedInvestmentVes: result.amountBs,
+    refundedVes: 0,
+    accreditationConfirmedAt: null,
     status: 'pending',
     statusHistory: [
       {

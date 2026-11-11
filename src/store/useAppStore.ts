@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { calculate } from '../domain/calculations';
+import {
+  calculate,
+  recalculateAccreditation,
+  round2,
+} from '../domain/calculations';
 import { calculateExecution, canTransition } from '../domain/purchases';
 import type {
+  AccreditationType,
   BankProfile,
   BankProfileDraft,
   CalculationInput,
@@ -14,15 +19,18 @@ import type {
   RateKey,
   RateSource,
   Rates,
+  StatusChange,
   ThemeMode,
 } from '../domain/types';
 import {
   formatZodIssues,
+  normalizePurchasesPayload,
   persistedStateSchema,
   purchaseRecordSchema,
+  withLegacyAccreditationDefaults,
 } from '../domain/validation';
 import { createId } from '../utils/id';
-import { formatRate } from '../utils/format';
+import { formatBs, formatPct, formatRate, formatUsd } from '../utils/format';
 
 export const SCHEMA_VERSION = 1;
 
@@ -35,6 +43,13 @@ const DEFAULT_FILTERS: PurchaseFilters = {
   dateFrom: '',
   dateTo: '',
 };
+
+export interface AccreditationRequest {
+  accreditationType: AccreditationType;
+  accreditedUsd: number;
+  keepInterbankSunk: boolean;
+  note?: string;
+}
 
 export interface AppState {
   schemaVersion: number;
@@ -55,6 +70,7 @@ export interface AppState {
   deleteProfile(id: string): void;
 
   recordPurchase(input: CalculationInput, notes?: string): PurchaseRecord;
+  accreditPurchase(id: string, request: AccreditationRequest): PurchaseRecord;
   changePurchaseStatus(
     id: string,
     nextStatus: PurchaseStatus,
@@ -97,7 +113,7 @@ function migratePersistedState(persistedState: unknown, _version: number): Persi
   const storedBcv = isRecord(storedRates.bcv) ? storedRates.bcv : {};
   const storedBinance = isRecord(storedRates.binance) ? storedRates.binance : {};
 
-  const migrated = {
+  const migrated = normalizePurchasesPayload({
     ...defaults,
     ...stored,
     schemaVersion: SCHEMA_VERSION,
@@ -106,7 +122,7 @@ function migratePersistedState(persistedState: unknown, _version: number): Persi
       binance: { ...defaults.rates.binance, ...storedBinance },
     },
     disclaimer: { ...defaults.disclaimer, ...storedDisclaimer },
-  };
+  });
   const parsed = persistedStateSchema.safeParse(migrated);
 
   return parsed.success ? parsed.data : defaults;
@@ -139,6 +155,14 @@ function createPurchaseRecord(
     estimatedProfitBs: result.netProfitBs,
     estimatedRoiPct: result.roiPct,
     breakEvenRate: result.breakEvenRate,
+    requestedInvestmentVes: result.amountBs,
+    requestedUsd: result.usdBought,
+    accreditationType: 'TOTAL',
+    accreditedUsd: result.usdBought,
+    accreditationRatePercent: 100,
+    executedInvestmentVes: result.amountBs,
+    refundedVes: 0,
+    accreditationConfirmedAt: null,
     status: 'pending',
     statusHistory: [
       {
@@ -210,6 +234,94 @@ export const useAppStore = create<AppState>()(
         return purchase;
       },
 
+      accreditPurchase: (id, request) => {
+        const purchase = get().purchases.find((record) => record.id === id);
+        if (!purchase) throw new Error('Compra no encontrada');
+        if (purchase.status !== 'pending') {
+          throw new Error('Solo las compras pendientes pueden registrar una acreditación');
+        }
+        if (purchase.accreditationConfirmedAt !== null) {
+          throw new Error('La acreditación de esta compra ya fue confirmada');
+        }
+        if (!canTransition(purchase.status, 'usd_credited')) {
+          throw new Error('Transición de estado no permitida');
+        }
+
+        const requestedUsd = round2(purchase.requestedUsd);
+        const accreditedUsd =
+          request.accreditationType === 'TOTAL'
+            ? requestedUsd
+            : round2(request.accreditedUsd);
+
+        if (!Number.isFinite(accreditedUsd) || accreditedUsd <= 0) {
+          throw new Error('Los USD acreditados deben ser mayores que 0');
+        }
+        if (accreditedUsd > requestedUsd) {
+          throw new Error('Los USD acreditados no pueden superar los USD solicitados');
+        }
+
+        const preview = recalculateAccreditation(
+          purchase,
+          accreditedUsd,
+          request.keepInterbankSunk,
+        );
+        const timestamp = new Date().toISOString();
+        const rateLabel = formatPct(
+          preview.accreditationRatePercent,
+          preview.accreditationType === 'TOTAL' ? 0 : 2,
+        );
+        const detail =
+          preview.accreditationType === 'TOTAL'
+            ? `Acreditación total: aprobados ${formatUsd(preview.accreditedUsd)} de ${formatUsd(purchase.requestedUsd)} solicitados (${rateLabel}).`
+            : `Acreditación parcial: aprobados ${formatUsd(preview.accreditedUsd)} de ${formatUsd(purchase.requestedUsd)} solicitados (${rateLabel}). Liberados ${formatBs(preview.refundedVes)}.`;
+        const auditNote = request.note?.trim() ?? '';
+        const historyEntry: StatusChange = {
+          id: createId(),
+          timestamp,
+          fromStatus: purchase.status,
+          toStatus: 'usd_credited',
+          note: auditNote ? `${detail} · ${auditNote}` : detail,
+          metadata: {
+            accreditationType: preview.accreditationType,
+            requestedInvestmentVes: purchase.requestedInvestmentVes,
+            requestedUsd: purchase.requestedUsd,
+            accreditedUsd: preview.accreditedUsd,
+            accreditationRatePercent: preview.accreditationRatePercent,
+            executedInvestmentVes: preview.amountBs,
+            refundedVes: preview.refundedVes,
+            keepInterbankSunk: preview.keepInterbankSunk,
+          },
+        };
+        const updated: PurchaseRecord = {
+          ...purchase,
+          amountBs: preview.amountBs,
+          usdBought: preview.usdBought,
+          usdForBinance: preview.usdForBinance,
+          usdDeposited: preview.usdDeposited,
+          totalCostBs: preview.totalCostBs,
+          estimatedBsOut: preview.bsOut,
+          estimatedProfitBs: preview.netProfitBs,
+          estimatedRoiPct: preview.roiPct,
+          breakEvenRate: preview.breakEvenRate,
+          accreditationType: preview.accreditationType,
+          accreditedUsd: preview.accreditedUsd,
+          accreditationRatePercent: preview.accreditationRatePercent,
+          executedInvestmentVes: preview.amountBs,
+          refundedVes: preview.refundedVes,
+          accreditationConfirmedAt: timestamp,
+          status: 'usd_credited',
+          statusHistory: [...purchase.statusHistory, historyEntry],
+          execution: null,
+        };
+
+        set((state) => ({
+          purchases: state.purchases.map((record) =>
+            record.id === id ? updated : record,
+          ),
+        }));
+        return updated;
+      },
+
       changePurchaseStatus: (id, nextStatus, note = '', realBinanceRate) => {
         const purchase = get().purchases.find((record) => record.id === id);
         if (!purchase) throw new Error('Compra no encontrada');
@@ -269,7 +381,9 @@ export const useAppStore = create<AppState>()(
 
       importPurchases: (records) => {
         const imported = records.map((record) => {
-          const parsed = purchaseRecordSchema.safeParse(record);
+          const parsed = purchaseRecordSchema.safeParse(
+            withLegacyAccreditationDefaults(record),
+          );
           if (!parsed.success) {
             throw new Error(formatZodIssues(parsed.error).join('; '));
           }
@@ -297,7 +411,7 @@ export const useAppStore = create<AppState>()(
       },
 
       importConfig: (config) => {
-        const parsed = persistedStateSchema.safeParse(config);
+        const parsed = persistedStateSchema.safeParse(normalizePurchasesPayload(config));
         if (!parsed.success) {
           throw new Error(`La configuración importada no es válida: ${formatZodIssues(parsed.error).join('; ')}`);
         }
@@ -327,7 +441,9 @@ export const useAppStore = create<AppState>()(
       }),
       migrate: migratePersistedState,
       merge: (persistedState, currentState) => {
-        const parsed = persistedStateSchema.safeParse(persistedState);
+        const parsed = persistedStateSchema.safeParse(
+          normalizePurchasesPayload(persistedState),
+        );
         if (!parsed.success) return currentState;
         return { ...currentState, ...parsed.data };
       },

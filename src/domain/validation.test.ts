@@ -8,6 +8,7 @@ import {
   persistedStateSchema,
   purchaseRecordSchema,
   purchasesExportSchema,
+  withLegacyAccreditationDefaults,
 } from './validation';
 
 const profile: BankProfile = {
@@ -79,6 +80,14 @@ const purchase: PurchaseRecord = {
   estimatedProfitBs: 1_082.78,
   estimatedRoiPct: 10.8278,
   breakEvenRate: 10_000 / 240.93,
+  requestedInvestmentVes: 10_000,
+  requestedUsd: 248.75,
+  accreditationType: 'TOTAL',
+  accreditedUsd: 248.75,
+  accreditationRatePercent: 100,
+  executedInvestmentVes: 10_000,
+  refundedVes: 0,
+  accreditationConfirmedAt: null,
   status: 'pending',
   statusHistory: [],
   execution: null,
@@ -138,6 +147,58 @@ describe('purchase and persisted-state schemas', () => {
         purchases: [],
       }).success,
     ).toBe(false);
+  });
+
+  it('rejects partial accreditation amounts at or below zero and above the request', () => {
+    const partial: PurchaseRecord = {
+      ...purchase,
+      accreditationType: 'PARTIAL',
+      accreditedUsd: 124.38,
+      accreditationRatePercent: 50,
+      executedInvestmentVes: 5_000,
+      refundedVes: 5_000,
+      accreditationConfirmedAt: '2024-01-02T00:00:00.000Z',
+    };
+
+    expect(purchaseRecordSchema.safeParse(partial).success).toBe(true);
+    expect(
+      purchaseRecordSchema.safeParse({ ...partial, accreditedUsd: 0 }).success,
+    ).toBe(false);
+    expect(
+      purchaseRecordSchema.safeParse({ ...partial, accreditedUsd: -1 }).success,
+    ).toBe(false);
+    expect(
+      purchaseRecordSchema.safeParse({
+        ...partial,
+        accreditedUsd: purchase.requestedUsd + 0.01,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('normalizes legacy purchases without accreditation fields', () => {
+    const legacy = { ...purchase } as Record<string, unknown>;
+    for (const field of [
+      'requestedInvestmentVes',
+      'requestedUsd',
+      'accreditationType',
+      'accreditedUsd',
+      'accreditationRatePercent',
+      'executedInvestmentVes',
+      'refundedVes',
+      'accreditationConfirmedAt',
+    ]) {
+      delete legacy[field];
+    }
+
+    const normalized = withLegacyAccreditationDefaults(legacy) as PurchaseRecord;
+
+    expect(normalized.requestedInvestmentVes).toBe(purchase.amountBs);
+    expect(normalized.requestedUsd).toBe(purchase.usdBought);
+    expect(normalized.accreditationType).toBe('TOTAL');
+    expect(normalized.accreditationRatePercent).toBe(100);
+    expect(normalized.refundedVes).toBe(0);
+    expect(normalized.accreditationConfirmedAt).toBeNull();
+    expect(purchaseRecordSchema.safeParse(normalized).success).toBe(true);
   });
 
   it('validates both export payload formats', () => {
