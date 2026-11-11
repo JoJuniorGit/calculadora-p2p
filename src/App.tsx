@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from './store/useAppStore';
 import { Button } from './components/ui/Button';
-import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import {
   getExchangeGap,
   PROFITABILITY_GREEN_MIN_PCT,
@@ -33,14 +32,47 @@ function formatTickerRate(value: number): string {
   return Number.isFinite(value) && value > 0 ? tickerNumberFormatter.format(value) : '—';
 }
 
+function MoonIcon() {
+  return (
+    <svg
+      className={styles.themeIcon}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg
+      className={styles.themeIcon}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
 export default function App() {
   const theme = useAppStore((state) => state.theme);
   const disclaimer = useAppStore((state) => state.disclaimer);
   const rates = useAppStore((state) => state.rates);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
-  const loadDemoData = useAppStore((state) => state.loadDemoData);
   const [activeTab, setActiveTab] = useState<AppTab>('rates');
-  const [demoDialogOpen, setDemoDialogOpen] = useState(false);
   const ratesConfigured =
     Number.isFinite(rates.bcv.value) &&
     rates.bcv.value > 0 &&
@@ -81,12 +113,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const confirmDemoData = (): void => {
-    loadDemoData();
-    setDemoDialogOpen(false);
-    setActiveTab('records');
-  };
-
   return (
     <main className={styles.app}>
       <div className={styles.container}>
@@ -96,11 +122,14 @@ export default function App() {
             <p>Arbitraje USD/VES</p>
           </div>
           <div className={styles.headerActions}>
-            <Button variant="secondary" onClick={toggleTheme}>
-              {theme === 'light' ? 'Tema oscuro' : 'Tema claro'}
-            </Button>
-            <Button variant="secondary" onClick={() => setDemoDialogOpen(true)}>
-              Cargar datos demo
+            <Button
+              variant="secondary"
+              className={styles.themeToggle}
+              onClick={toggleTheme}
+              aria-label={`Cambiar a tema ${theme === 'light' ? 'oscuro' : 'claro'}`}
+              title={`Cambiar a tema ${theme === 'light' ? 'oscuro' : 'claro'}`}
+            >
+              {theme === 'light' ? <MoonIcon /> : <SunIcon />}
             </Button>
           </div>
         </header>
@@ -162,15 +191,6 @@ export default function App() {
           {activeTab === 'records' && <PurchasesPanel />}
         </div>
       </div>
-
-      <ConfirmDialog
-        open={demoDialogOpen}
-        title="Cargar datos de demostración"
-        message="Se agregarán un perfil de demostración y un registro completado si aún no existen, y se establecerán las tasas de demostración."
-        confirmLabel="Cargar datos demo"
-        onConfirm={confirmDemoData}
-        onCancel={() => setDemoDialogOpen(false)}
-      />
     </main>
   );
 }

@@ -46,6 +46,19 @@
   min-width: 0;
 }
 
+.themeToggle {
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.themeIcon {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 .ticker {
   display: flex;
   align-items: center;
@@ -220,10 +233,6 @@
   .app {
     padding-right: 0.75rem;
     padding-left: 0.75rem;
-  }
-
-  .headerActions > button {
-    flex: 1 1 140px;
   }
 
   .tab {

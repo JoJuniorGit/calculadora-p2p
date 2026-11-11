@@ -47,10 +47,7 @@ function clickButton(text: string): void {
 }
 
 describe('client render smoke', () => {
-  it('renders all tabs with demo data and computed results', () => {
-    act(() => {
-      useAppStore.getState().loadDemoData();
-    });
+  it('renders all tabs with an empty store', () => {
     act(() => {
       root?.render(<App />);
     });
@@ -60,11 +57,10 @@ describe('client render smoke', () => {
     clickButton('Calculadora');
     expect(container.textContent).toContain('Monto a invertir');
     expect(container.textContent).toContain('La comisión por intervención es fija');
-    expect(container.textContent).toContain('Banco Demo');
+    expect(container.textContent).toContain('No hay perfiles bancarios configurados');
 
     clickButton('Registros');
-    expect(container.textContent).toContain('Banco Demo');
     expect(container.textContent).toContain('Capital en tránsito');
-    expect(container.textContent).toContain('Vendido/Completado');
+    expect(container.textContent).toContain('Todavía no hay compras registradas');
   });
 });

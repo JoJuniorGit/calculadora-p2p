@@ -237,64 +237,8 @@ describe('useAppStore imports', () => {
   });
 });
 
-describe('useAppStore demo data and persistence', () => {
+describe('useAppStore persistence', () => {
   beforeEach(resetStore);
-
-  it('adds one completed demo purchase and profile idempotently', () => {
-    const userPurchase = createPurchase('user-purchase');
-    useAppStore.setState({ purchases: [userPurchase] });
-
-    useAppStore.getState().loadDemoData();
-    useAppStore.getState().loadDemoData();
-
-    const state = useAppStore.getState();
-    const demoProfiles = state.profiles.filter((profile) => profile.name === 'Banco Demo');
-    const demoPurchases = state.purchases.filter((purchase) => purchase.id.startsWith('demo-'));
-
-    expect(state.rates).toMatchObject({
-      bcv: { value: 40, source: 'manual' },
-      binance: { value: 46, source: 'manual' },
-    });
-    expect(demoProfiles).toHaveLength(1);
-    expect(demoProfiles[0]).toMatchObject({
-      cardCommissionPct: 2,
-      cardCommissionBase: 'usd',
-      binanceDepositPct: 1,
-      binanceDepositFixedUsd: 0.5,
-      interbankEnabled: true,
-      interbankPct: 0.3,
-      interbankBase: 'initial',
-      igtfEnabled: false,
-      igtfPct: 3,
-      igtfBase: 'card',
-      slippageEnabled: false,
-      slippagePct: 2,
-    });
-    expect(demoPurchases).toHaveLength(1);
-    expect(demoPurchases[0]).toMatchObject({
-      status: 'completed',
-      notes: 'Registro de demostración — operación completada.',
-      snapshot: {
-        amountBs: 1_000,
-        interbankEnabled: true,
-        igtfEnabled: false,
-        slippageEnabled: false,
-      },
-      execution: { realBinanceRate: 46.5 },
-    });
-    expect(demoPurchases[0].statusHistory).toHaveLength(4);
-    expect(demoPurchases[0].statusHistory.map((entry) => entry.toStatus)).toEqual([
-      'pending',
-      'usd_credited',
-      'deposited_binance',
-      'completed',
-    ]);
-    expect(demoPurchases[0].execution?.closedAt).toBe(
-      demoPurchases[0].statusHistory[3].timestamp,
-    );
-    expect(state.purchases[0]).toEqual(userPurchase);
-    expect(state.purchases).toHaveLength(2);
-  });
 
   it('migrates a version-zero persisted slice without schemaVersion', async () => {
     const legacyState = {

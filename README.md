@@ -76,10 +76,6 @@ Los indicadores contables se calculan sobre todos los registros, no sobre la lis
 
 La pantalla exporta los resultados filtrados en JSON o CSV. Los archivos incluyen `schemaVersion`; para importar CSV se acepta el formato exportado por esta aplicación. La configuración completa también se puede intercambiar como JSON.
 
-## Datos de demostración
-
-`Cargar datos demo` abre una confirmación, fija las tasas manuales en 40 Bs.S/USD para BCV y 46 Bs.S/USD para Binance, agrega el perfil `Banco Demo` si aún no existe y crea una compra completada de demostración solo si todavía no hay una. Después abre la pestaña Registros.
-
 ## Estructura principal
 
 ```text
@@ -103,7 +99,7 @@ La navegación del shell incluye las cuatro pestañas operativas: Tasas, Perfile
 
 ## Pruebas
 
-Las 52 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta y un smoke test de render cliente del shell con datos demo.
+Las 51 pruebas de Vitest cubren redondeo y etapas del motor, modos de entrada y bases de comisiones, el gross-up de la comisión de tarjeta en USD, validación Zod, transiciones y ejecución de compras, KPIs, estado del store y migración de persistencia, exportación e importación JSON/CSV, la consulta Binance P2P del lado de venta y un smoke test de render cliente del shell con estado vacío.
 
 ## Aviso
 

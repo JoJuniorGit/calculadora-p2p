@@ -69,7 +69,6 @@ export interface AppState {
 
   importPurchases(records: PurchaseRecord[]): number;
   importConfig(config: PersistedState): void;
-  loadDemoData(): void;
 }
 
 function createPersistedDefaults(): PersistedState {
@@ -152,88 +151,6 @@ function createPurchaseRecord(
     ],
     execution: null,
     notes,
-  };
-}
-
-function createDemoProfile(timestamp: string): BankProfile {
-  return {
-    id: createId(),
-    name: 'Banco Demo',
-    cardCommissionPct: 2,
-    cardCommissionBase: 'usd',
-    binanceDepositPct: 1,
-    binanceDepositFixedUsd: 0.5,
-    interbankEnabled: true,
-    interbankPct: 0.3,
-    interbankBase: 'initial',
-    igtfEnabled: false,
-    igtfPct: 3,
-    igtfBase: 'card',
-    slippageEnabled: false,
-    slippagePct: 2,
-    notes: 'Perfil de demostración para simular una operación; no representa condiciones bancarias reales.',
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-}
-
-function createDemoPurchase(profile: BankProfile, now: Date): PurchaseRecord {
-  const timeline = [
-    new Date(now.getTime() - 105 * 60_000).toISOString(),
-    new Date(now.getTime() - 75 * 60_000).toISOString(),
-    new Date(now.getTime() - 40 * 60_000).toISOString(),
-    new Date(now.getTime() - 10 * 60_000).toISOString(),
-  ];
-  const input: CalculationInput = {
-    mode: 'bs',
-    amount: 1_000,
-    bcvRate: 40,
-    binanceRate: 46,
-    profile,
-    options: {
-      interbankEnabled: true,
-      igtfEnabled: false,
-      slippageEnabled: false,
-    },
-  };
-  const purchase = createPurchaseRecord(input, `demo-${createId()}`, timeline[0], 'Registro de demostración — operación completada.');
-  const statusHistory: PurchaseRecord['statusHistory'] = [
-    {
-      id: createId(),
-      timestamp: timeline[0],
-      fromStatus: null,
-      toStatus: 'pending',
-      note: 'Compra de demostración registrada',
-    },
-    {
-      id: createId(),
-      timestamp: timeline[1],
-      fromStatus: 'pending',
-      toStatus: 'usd_credited',
-      note: 'Divisas acreditadas',
-    },
-    {
-      id: createId(),
-      timestamp: timeline[2],
-      fromStatus: 'usd_credited',
-      toStatus: 'deposited_binance',
-      note: 'Depósito realizado en Binance',
-    },
-    {
-      id: createId(),
-      timestamp: timeline[3],
-      fromStatus: 'deposited_binance',
-      toStatus: 'completed',
-      note: `Venta real a ${formatRate(46.5)} Bs.S/USD`,
-    },
-  ];
-  const execution = calculateExecution(purchase, 46.5);
-
-  return {
-    ...purchase,
-    status: 'completed',
-    statusHistory,
-    execution: { ...execution, closedAt: timeline[3] },
   };
 }
 
@@ -394,29 +311,6 @@ export const useAppStore = create<AppState>()(
           theme: parsed.data.theme,
           filters: { ...DEFAULT_FILTERS },
         });
-      },
-
-      loadDemoData: () => {
-        const now = new Date();
-        const timestamp = now.toISOString();
-        const current = get();
-        const profile =
-          current.profiles.find((candidate) => candidate.name === 'Banco Demo') ??
-          createDemoProfile(timestamp);
-        const hasDemoPurchase = current.purchases.some((purchase) => purchase.id.startsWith('demo-'));
-        const demoPurchase = hasDemoPurchase ? null : createDemoPurchase(profile, now);
-
-        set((state) => ({
-          rates: {
-            ...state.rates,
-            bcv: { value: 40, updatedAt: timestamp, source: 'manual' },
-            binance: { value: 46, updatedAt: timestamp, source: 'manual' },
-          },
-          profiles: state.profiles.some((candidate) => candidate.name === 'Banco Demo')
-            ? state.profiles
-            : [...state.profiles, profile],
-          purchases: demoPurchase ? [...state.purchases, demoPurchase] : state.purchases,
-        }));
       },
     }),
     {
