@@ -1,0 +1,183 @@
+.content {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.summaryItem {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.summaryLabel {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.summaryValue {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.modeSelector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.modeButton {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 620;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.modeButton:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.modeButtonActive,
+.modeButtonActive:hover {
+  border-color: var(--primary-glow);
+  background: var(--bg-elevated);
+  box-shadow: var(--focus-ring);
+  color: var(--primary);
+}
+
+.totalHint {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--primary-glow);
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.rateIndicator {
+  display: flex;
+  align-items: center;
+  padding: 0 0.6rem;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.previewCard {
+  display: grid;
+  align-content: start;
+  gap: 0.22rem;
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-gradient);
+}
+
+.previewLabel {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.previewValue {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.87rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.positiveValue {
+  color: var(--success);
+}
+
+.negativeValue {
+  color: var(--danger);
+}
+
+.warningValue {
+  color: var(--warning);
+}
+
+.warningAlert,
+.dangerAlert {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.warningAlert {
+  border-color: var(--warning-glow);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.dangerAlert {
+  border-color: var(--danger-glow);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 460px) {
+  .summaryRow,
+  .previewGrid,
+  .modeSelector {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions > button {
+    flex: 1 1 130px;
+  }
+}

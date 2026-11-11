@@ -24,6 +24,7 @@ import styles from './PurchaseDetailModal.module.css';
 interface PurchaseDetailModalProps {
   purchaseId: string | null;
   onClose(): void;
+  onRequestAccreditation(purchaseId: string): void;
 }
 
 interface DetailItem {
@@ -98,7 +99,11 @@ function getIgtfBaseLabel(purchase: PurchaseRecord): string {
     : 'Sobre la inversión total en Bs.S';
 }
 
-export function PurchaseDetailModal({ purchaseId, onClose }: PurchaseDetailModalProps) {
+export function PurchaseDetailModal({
+  purchaseId,
+  onClose,
+  onRequestAccreditation,
+}: PurchaseDetailModalProps) {
   const purchase = useAppStore((state) =>
     state.purchases.find((record) => record.id === purchaseId) ?? null,
   );
@@ -173,14 +178,19 @@ export function PurchaseDetailModal({ purchaseId, onClose }: PurchaseDetailModal
     setTransitionError(null);
     setRealSaleRateError(undefined);
 
-    if (nextStatus === 'completed') {
-      setRealSaleRateText(rates.binance.value > 0 ? toInputNumber(rates.binance.value) : '');
-      setClosingModalOpen(true);
+    if (nextStatus === 'cancelled') {
+      setCancellationConfirmOpen(true);
       return;
     }
 
-    if (nextStatus === 'cancelled') {
-      setCancellationConfirmOpen(true);
+    if (purchase && purchase.accreditationConfirmedAt === null) {
+      onRequestAccreditation(purchase.id);
+      return;
+    }
+
+    if (nextStatus === 'completed') {
+      setRealSaleRateText(rates.binance.value > 0 ? toInputNumber(rates.binance.value) : '');
+      setClosingModalOpen(true);
       return;
     }
 
@@ -234,6 +244,41 @@ export function PurchaseDetailModal({ purchaseId, onClose }: PurchaseDetailModal
     },
     { label: 'Modo', value: formatMode(purchase) },
     { label: 'Monto ingresado', value: formatInputAmount(purchase) },
+  ];
+
+  const accreditationEntry = [...purchase.statusHistory]
+    .reverse()
+    .find((entry) => entry.metadata?.accreditationType !== undefined);
+  const keepInterbankSunk = accreditationEntry?.metadata?.keepInterbankSunk;
+  const showAccreditation =
+    purchase.accreditationConfirmedAt !== null ||
+    purchase.accreditationType === 'PARTIAL';
+  const accreditationItems: DetailItem[] = [
+    {
+      label: 'Tipo de acreditación',
+      value: `${purchase.accreditationType === 'PARTIAL' ? 'Parcial' : 'Total'} · ${formatPct(purchase.accreditationRatePercent, purchase.accreditationType === 'TOTAL' ? 0 : 2)}`,
+    },
+    { label: 'USD solicitados', value: formatUsd(purchase.requestedUsd) },
+    { label: 'Bs.S solicitados', value: formatBs(purchase.requestedInvestmentVes) },
+    { label: 'USD aprobados', value: formatUsd(purchase.accreditedUsd) },
+    { label: 'Bs.S debitados', value: formatBs(purchase.executedInvestmentVes) },
+    { label: 'Bs.S liberados', value: formatBs(purchase.refundedVes) },
+    ...(purchase.accreditationConfirmedAt
+      ? [
+          {
+            label: 'Confirmada',
+            value: formatDateTime(purchase.accreditationConfirmedAt),
+          },
+        ]
+      : []),
+    ...(keepInterbankSunk !== undefined
+      ? [
+          {
+            label: 'Interbancario hundido',
+            value: keepInterbankSunk ? 'Sí' : 'No',
+          },
+        ]
+      : []),
   ];
 
   const snapshotItems: DetailItem[] = [
@@ -321,6 +366,15 @@ export function PurchaseDetailModal({ purchaseId, onClose }: PurchaseDetailModal
             <h3 id={`${notesId}-summary`} className={styles.sectionTitle}>Resumen</h3>
             <DetailList items={summaryItems} />
           </section>
+
+          {showAccreditation && (
+            <section className={styles.detailSection} aria-labelledby={`${notesId}-accreditation`}>
+              <h3 id={`${notesId}-accreditation`} className={styles.sectionTitle}>
+                Acreditación bancaria
+              </h3>
+              <DetailList items={accreditationItems} />
+            </section>
+          )}
 
           <section className={styles.detailSection} aria-labelledby={`${notesId}-snapshot`}>
             <h3 id={`${notesId}-snapshot`} className={styles.sectionTitle}>Snapshot reproducible</h3>

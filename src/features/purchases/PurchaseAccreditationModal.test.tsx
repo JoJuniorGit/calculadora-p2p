@@ -43,8 +43,8 @@ function createProfile(overrides: Partial<BankProfile> = {}): BankProfile {
 
 function createInput(overrides: Partial<CalculationInput> = {}): CalculationInput {
   return {
-    mode: 'bs',
-    amount: 10_000,
+    mode: 'usd',
+    amount: 300,
     bcvRate: 40,
     binanceRate: 46,
     profile: createProfile(),

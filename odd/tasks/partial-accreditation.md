@@ -35,9 +35,9 @@ Out of scope: changing the status machine order, recalculating already-completed
 
 ## Tasks
 
-- [ ] T1 - Domain model, shared calculation core, `recalculateAccreditation`, audit metadata, Zod limits and legacy normalization, domain tests.
-- [ ] T2 - Store `accreditPurchase`, record defaults, import/export/CSV normalization, KPI behavior, store/storage tests.
-- [ ] T3 - Accreditation modal, quick-action interception, table/mobile partial badge, detail modal section, UI tests, full verification.
+- [x] T1 - Domain model, shared calculation core, `recalculateAccreditation`, audit metadata, Zod limits and legacy normalization, domain tests.
+- [x] T2 - Store `accreditPurchase`, record defaults, import/export/CSV normalization, KPI behavior, store/storage tests.
+- [x] T3 - Accreditation modal, quick-action interception, table/mobile partial badge, detail modal section, UI tests, full verification.
 
 ## Acceptance criteria
 
@@ -57,3 +57,16 @@ Out of scope: changing the status machine order, recalculating already-completed
 - `npx vitest run` focused domain/store/storage/UI tests during each task.
 - `npm run test` and `npm run build` at closure.
 - TDD: observe RED for each new behavior before implementation.
+
+## Verification log
+
+- Domain RED/GREEN: `src/domain/accreditation.test.ts` (4 tests) covers total reproduction, proportional partial, fixed/sunk degradation, and amount limits.
+- Store/storage: `useAppStore.test.ts` (10 tests), `exportImport.test.ts` (6), `validation.test.ts` (9), and KPI tests are green.
+- UI RED/GREEN: `PurchaseAccreditationModal.test.tsx` (3 tests) and `PurchasesPanel.test.tsx` (5 tests) are green.
+- `npm run test`: 70/70 across 12 files.
+- `npm run build`: green, 111 modules transformed.
+
+## Commit log
+
+- `d5d2dc3` feat(accreditation): add partial accreditation domain and store flow.
+- Pending UI work-unit commit.

@@ -115,6 +115,47 @@ describe('PurchasesPanel financial table', () => {
     expect(buttons[0]?.getAttribute('aria-label')).toBe('Avanzar estado para Banco Test, 2 ene. 2024');
   });
 
+  it('opens the accreditation modal from the quick action of a pending purchase', () => {
+    const quickAction = container.querySelector<HTMLButtonElement>(
+      'tbody tr td:last-child button[title="Avanzar estado"]',
+    );
+
+    act(() => {
+      quickAction?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Acreditación bancaria');
+    expect(container.textContent).toContain('Acreditación total (100%)');
+    expect(container.textContent).toContain('USD solicitados');
+  });
+
+  it('shows a partial accreditation badge with the requested and released amounts', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: [
+          createPurchase({
+            status: 'usd_credited',
+            accreditationType: 'PARTIAL',
+            accreditationRatePercent: 42.78,
+            accreditedUsd: 106.95,
+            executedInvestmentVes: 4_300,
+            refundedVes: 5_700,
+            accreditationConfirmedAt: '2024-01-03T12:00:00.000Z',
+          }),
+        ],
+      });
+    });
+
+    const badge = container.querySelector<HTMLElement>(
+      'tbody tr td:nth-child(4) span[title*="Solicitado"]',
+    );
+
+    expect(badge?.textContent).toContain('Parcial (42,78%)');
+    expect(badge?.getAttribute('title')).toContain('Solicitado:');
+    expect(badge?.getAttribute('title')).toContain('Aprobado:');
+    expect(badge?.getAttribute('title')).toContain('Liberado:');
+  });
+
   it('labels the quick action for liquidation when completion is next', () => {
     act(() => {
       useAppStore.setState({

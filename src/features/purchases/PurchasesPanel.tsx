@@ -10,13 +10,14 @@ import {
   parsePurchasesCsv,
   parsePurchasesJson,
 } from '../../storage/exportImport';
-import { formatAmount, formatBs, formatDate, formatPct } from '../../utils/format';
+import { formatAmount, formatBs, formatDate, formatPct, formatUsd } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { InfoTooltip } from '../../components/ui/InfoTooltip';
 import { SelectField } from '../../components/ui/SelectField';
+import { PurchaseAccreditationModal } from './PurchaseAccreditationModal';
 import { PurchaseDetailModal } from './PurchaseDetailModal';
 import { PurchaseRowActions } from './PurchaseRowActions';
 import { filterPurchases } from './purchaseFilters';
@@ -69,6 +70,10 @@ function formatImportErrors(errors: string[]): string {
   return visibleErrors.join('\n');
 }
 
+function getPartialAccreditationTitle(purchase: PurchaseRecord): string {
+  return `Solicitado: ${formatUsd(purchase.requestedUsd)} (${formatBs(purchase.requestedInvestmentVes)}) | Aprobado: ${formatUsd(purchase.accreditedUsd)} | Liberado: ${formatBs(purchase.refundedVes)}`;
+}
+
 export function PurchasesPanel() {
   const purchases = useAppStore((state) => state.purchases);
   const profiles = useAppStore((state) => state.profiles);
@@ -80,6 +85,7 @@ export function PurchasesPanel() {
   const importPurchases = useAppStore((state) => state.importPurchases);
 
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+  const [accreditationTargetId, setAccreditationTargetId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const [dataNotice, setDataNotice] = useState<DataNotice | null>(null);
@@ -169,6 +175,11 @@ export function PurchasesPanel() {
   };
 
   const handleQuickAdvance = (purchase: PurchaseRecord, nextStatus: PurchaseStatus): void => {
+    if (nextStatus !== 'cancelled' && purchase.accreditationConfirmedAt === null) {
+      setAccreditationTargetId(purchase.id);
+      return;
+    }
+
     if (nextStatus === 'completed') {
       setSelectedPurchaseId(purchase.id);
       return;
@@ -330,7 +341,19 @@ export function PurchasesPanel() {
                         <td>{formatDate(purchase.createdAt)}</td>
                         <td className={styles.bankCell}>{purchase.profileName}</td>
                         <td className={styles.numericCell}>{formatAmount(purchase.amountBs)}</td>
-                        <td className={styles.numericCell}>{formatAmount(purchase.usdDeposited)}</td>
+                        <td className={styles.numericCell}>
+                          <span className={styles.numericStack}>
+                            <span>{formatAmount(purchase.usdDeposited)}</span>
+                            {purchase.accreditationType === 'PARTIAL' && (
+                              <span
+                                className={styles.partialBadge}
+                                title={getPartialAccreditationTitle(purchase)}
+                              >
+                                Parcial ({formatPct(purchase.accreditationRatePercent)})
+                              </span>
+                            )}
+                          </span>
+                        </td>
                         <td className={styles.numericCell}>{formatAmount(outcome.bsOut)}</td>
                         <td className={`${styles.numericCell} ${styles.emphasisCell} ${outcome.profitBs < 0 ? styles.negativeValue : styles.positiveValue}`}>
                           {formatAmount(outcome.profitBs)}
@@ -385,7 +408,20 @@ export function PurchasesPanel() {
                     </header>
                     <dl className={styles.mobileDetails}>
                       <div><dt>Invertido (Bs.S)</dt><dd>{formatAmount(purchase.amountBs)}</dd></div>
-                      <div><dt>USD depositados</dt><dd>{formatAmount(purchase.usdDeposited)}</dd></div>
+                      <div>
+                        <dt>USD depositados</dt>
+                        <dd className={styles.mobileValueStack}>
+                          <span>{formatAmount(purchase.usdDeposited)}</span>
+                          {purchase.accreditationType === 'PARTIAL' && (
+                            <span
+                              className={styles.partialBadge}
+                              title={getPartialAccreditationTitle(purchase)}
+                            >
+                              Parcial ({formatPct(purchase.accreditationRatePercent)})
+                            </span>
+                          )}
+                        </dd>
+                      </div>
                       <div><dt>Bs.S de salida</dt><dd>{formatAmount(outcome.bsOut)}</dd></div>
                       <div>
                         <dt>Utilidad (Bs.S)</dt>
@@ -448,6 +484,11 @@ export function PurchasesPanel() {
       <PurchaseDetailModal
         purchaseId={selectedPurchaseId}
         onClose={() => setSelectedPurchaseId(null)}
+        onRequestAccreditation={(purchaseId) => setAccreditationTargetId(purchaseId)}
+      />
+      <PurchaseAccreditationModal
+        purchaseId={accreditationTargetId}
+        onClose={() => setAccreditationTargetId(null)}
       />
       <ConfirmDialog
         open={deleteTargetId !== null}
