@@ -155,7 +155,7 @@
 }
 
 .recordsTable {
-  min-width: 890px;
+  min-width: 1000px;
   font-size: 0.84rem;
 }
 
@@ -230,6 +230,18 @@
   min-height: 34px;
   padding: 0.38rem 0.5rem;
   font-size: 0.78rem;
+}
+
+.tableActions > .advanceButton,
+.mobileActions > .advanceButton {
+  color: var(--primary);
+}
+
+.tableActions > .advanceButton:hover:not(:disabled),
+.mobileActions > .advanceButton:hover:not(:disabled) {
+  border-color: var(--primary-glow);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .mobileList {

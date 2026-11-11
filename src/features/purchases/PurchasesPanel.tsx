@@ -199,7 +199,7 @@ export function PurchasesPanel() {
         {nextStatus && (
           <Button
             variant="secondary"
-            className={styles.actionButton}
+            className={`${styles.actionButton} ${styles.advanceButton}`}
             title={
               nextStatus === 'completed'
                 ? 'Abre el detalle para registrar la tasa real de venta antes de completar la operación.'

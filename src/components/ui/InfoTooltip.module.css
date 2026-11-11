@@ -46,7 +46,8 @@
 .tooltip {
   position: absolute;
   top: calc(100% + 0.45rem);
-  left: 50%;
+  right: 0;
+  left: auto;
   z-index: 1000;
   width: max-content;
   max-width: min(240px, calc(100vw - 2rem));
@@ -64,7 +65,7 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translate(-50%, -0.2rem);
+  transform: translateY(-0.2rem);
   transition:
     opacity 120ms ease,
     transform 120ms ease,
@@ -75,5 +76,5 @@
 .root:focus-within .tooltip {
   opacity: 1;
   visibility: visible;
-  transform: translate(-50%, 0);
+  transform: translateY(0);
 }

@@ -173,8 +173,39 @@
 
 .checkbox {
   flex: 0 0 auto;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 2.45rem;
+  height: 1.35rem;
   margin: 0;
-  accent-color: var(--primary);
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background-color: var(--bg-subtle);
+  background-image: radial-gradient(circle, var(--text-muted) 0 0.38rem, transparent 0.4rem);
+  background-repeat: no-repeat;
+  background-position: 0.22rem center;
+  background-size: 1rem 1rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition:
+    background-color 140ms ease,
+    background-position 140ms ease,
+    border-color 140ms ease;
+}
+
+.checkbox:checked {
+  border-color: var(--primary-glow);
+  background-color: var(--primary-soft);
+  background-image: radial-gradient(circle, var(--primary) 0 0.38rem, transparent 0.4rem);
+  background-position: calc(100% - 0.22rem) center;
+}
+
+.checkbox:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
