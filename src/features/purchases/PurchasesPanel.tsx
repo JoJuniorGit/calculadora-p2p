@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import type { PurchaseFilters, PurchaseRecord, PurchaseStatus } from '../../domain/types';
-import { PURCHASE_STATUS_LABELS } from '../../domain/purchases';
+import { getNextStatuses, PURCHASE_STATUS_LABELS } from '../../domain/purchases';
 import { computeKpis } from '../../domain/kpis';
 import { useAppStore } from '../../store/useAppStore';
 import {
@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { InfoTooltip } from '../../components/ui/InfoTooltip';
 import { SelectField } from '../../components/ui/SelectField';
 import { PurchaseDetailModal } from './PurchaseDetailModal';
 import { filterPurchases } from './purchaseFilters';
@@ -73,6 +74,7 @@ export function PurchasesPanel() {
   const filters = useAppStore((state) => state.filters);
   const setFilters = useAppStore((state) => state.setFilters);
   const resetFilters = useAppStore((state) => state.resetFilters);
+  const changePurchaseStatus = useAppStore((state) => state.changePurchaseStatus);
   const deletePurchase = useAppStore((state) => state.deletePurchase);
   const importPurchases = useAppStore((state) => state.importPurchases);
 
@@ -164,68 +166,117 @@ export function PurchasesPanel() {
     setDeleteTargetId(null);
   };
 
-  const renderActions = (purchase: PurchaseRecord, mobile = false) => (
-    <div className={mobile ? styles.mobileActions : styles.tableActions}>
-      <Button
-        variant="ghost"
-        className={styles.actionButton}
-        onClick={() => setSelectedPurchaseId(purchase.id)}
-      >
-        Ver detalle
-      </Button>
-      <Button
-        variant="danger"
-        className={styles.actionButton}
-        onClick={() => setDeleteTargetId(purchase.id)}
-      >
-        Eliminar
-      </Button>
-    </div>
-  );
+  const handleQuickAdvance = (purchase: PurchaseRecord, nextStatus: PurchaseStatus): void => {
+    if (nextStatus === 'completed') {
+      setSelectedPurchaseId(purchase.id);
+      return;
+    }
+
+    setDataNotice(null);
+    try {
+      changePurchaseStatus(purchase.id, nextStatus);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
+      setDataNotice({
+        tone: 'error',
+        message: `No se pudo avanzar el estado de la compra. ${detail}`,
+      });
+    }
+  };
+
+  const renderActions = (purchase: PurchaseRecord, mobile = false) => {
+    const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled');
+
+    return (
+      <div className={mobile ? styles.mobileActions : styles.tableActions}>
+        <Button
+          variant="secondary"
+          className={styles.actionButton}
+          onClick={() => setSelectedPurchaseId(purchase.id)}
+        >
+          Ver detalle
+        </Button>
+        {nextStatus && (
+          <Button
+            variant="secondary"
+            className={styles.actionButton}
+            title={
+              nextStatus === 'completed'
+                ? 'Abre el detalle para registrar la tasa real de venta antes de completar la operación.'
+                : `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]}`
+            }
+            onClick={() => handleQuickAdvance(purchase, nextStatus)}
+          >
+            Avanzar estado
+          </Button>
+        )}
+        <Button
+          variant="dangerGhost"
+          className={styles.actionButton}
+          onClick={() => setDeleteTargetId(purchase.id)}
+        >
+          Eliminar
+        </Button>
+      </div>
+    );
+  };
 
   const statusFilterValue: PurchaseFilters['status'] = filters.status;
 
   return (
     <section className={styles.panel} aria-label="Registros de compras">
-      <Card title="Resumen contable" className={styles.kpiCardContainer}>
+      <Card title="Resumen contable" className={styles.kpiCardContainer} style={{ overflow: 'visible' }}>
         <div className={styles.kpiGrid}>
           <article className={`${styles.kpiCard} ${styles.primaryKpi}`}>
-            <h3 className={styles.kpiLabel}>Capital en tránsito</h3>
+            <h3 className={styles.kpiLabel}>
+              <span>Capital en tránsito</span>
+              <InfoTooltip
+                label="Información sobre Capital en tránsito"
+                content="Operaciones pendientes, con divisas acreditadas o depositadas en Binance"
+              />
+            </h3>
             <strong className={styles.kpiValue}>{formatBs(kpis.inTransitCapitalBs)}</strong>
-            <p className={styles.kpiHint}>
-              Operaciones pendientes, con divisas acreditadas o depositadas en Binance
-            </p>
             <span className={styles.kpiCount}>
               {formatCount(kpis.inTransitCount, 'operación', 'operaciones')}
             </span>
           </article>
 
-          <article className={styles.kpiCard}>
-            <h3 className={styles.kpiLabel}>Ganancia líquida acumulada</h3>
+          <article className={`${styles.kpiCard} ${styles.completedKpi}`}>
+            <h3 className={styles.kpiLabel}>
+              <span>Ganancia líquida acumulada</span>
+              <InfoTooltip
+                label="Información sobre Ganancia líquida acumulada"
+                content="Solo operaciones completadas (ganancia ejecutada)"
+              />
+            </h3>
             <strong className={styles.kpiValue}>{formatBs(kpis.completedProfitBs)}</strong>
-            <p className={styles.kpiHint}>Solo operaciones completadas (ganancia ejecutada)</p>
             <span className={styles.kpiCount}>
               {formatCount(kpis.completedCount, 'operación completada', 'operaciones completadas')}
             </span>
           </article>
 
           <article className={styles.kpiCard}>
-            <h3 className={styles.kpiLabel}>ROI global ponderado</h3>
+            <h3 className={styles.kpiLabel}>
+              <span>ROI global ponderado</span>
+              <InfoTooltip
+                label="Información sobre ROI global ponderado"
+                content="Suma de utilidades / suma de costos de operaciones completadas"
+              />
+            </h3>
             <strong className={styles.kpiValue}>{formatPct(kpis.weightedRoiPct)}</strong>
-            <p className={styles.kpiHint}>
-              Suma de utilidades / suma de costos de operaciones completadas
-            </p>
           </article>
 
           <article className={`${styles.kpiCard} ${styles.cancelledKpi}`}>
-            <h3 className={styles.kpiLabel}>Canceladas</h3>
+            <h3 className={styles.kpiLabel}>
+              <span>Canceladas</span>
+              <InfoTooltip
+                label="Información sobre Canceladas"
+                content="Conteo informativo; se excluyen de todas las sumas"
+              />
+            </h3>
             <strong className={styles.kpiValue}>{kpis.cancelledCount}</strong>
-            <p className={styles.kpiHint}>Conteo informativo; se excluyen de todas las sumas</p>
           </article>
         </div>
-        <p className={styles.accountingNote}>
-          Las compras canceladas se muestran como conteo informativo y se excluyen de las sumas contables.
-        </p>
       </Card>
 
       <Card title="Filtros" className={styles.filtersCard}>
@@ -297,11 +348,11 @@ export function PurchasesPanel() {
                   <tr>
                     <th scope="col">Fecha</th>
                     <th scope="col">Banco</th>
-                    <th scope="col">Invertido</th>
-                    <th scope="col">USD depositados</th>
-                    <th scope="col">Bs.S de salida</th>
-                    <th scope="col">Utilidad</th>
-                    <th scope="col">ROI</th>
+                    <th scope="col" className={styles.numericHeader}>Invertido</th>
+                    <th scope="col" className={styles.numericHeader}>USD depositados</th>
+                    <th scope="col" className={styles.numericHeader}>Bs.S de salida</th>
+                    <th scope="col" className={styles.numericHeader}>Utilidad</th>
+                    <th scope="col" className={styles.numericHeader}>ROI</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Acciones</th>
                   </tr>

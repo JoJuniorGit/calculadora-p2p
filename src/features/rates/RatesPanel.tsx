@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RateKey, RateQuote } from '../../domain/types';
-import { getExchangeGap } from '../../domain/calculations';
+import {
+  getExchangeGap,
+  PROFITABILITY_GREEN_MIN_PCT,
+  PROFITABILITY_YELLOW_MIN_PCT,
+} from '../../domain/calculations';
 import { formatDateTime, formatPct, formatRate, toInputNumber } from '../../utils/format';
 import { useAppStore } from '../../store/useAppStore';
 import { Badge } from '../../components/ui/Badge';
@@ -40,6 +44,9 @@ function RateCard({
   onValueChange,
   onRefresh,
 }: RateCardProps) {
+  const rateName = rateKey === 'bcv' ? 'BCV' : 'Binance P2P';
+  const refreshLabel = `${loading ? 'Actualizando' : 'Actualizar'} tasa ${rateName}`;
+
   return (
     <Card title={title} className={styles.rateCard}>
       <div className={styles.rateCardContent}>
@@ -58,10 +65,27 @@ function RateCard({
           step={0.01}
           error={error}
           placeholder="Ej.: 36,50"
+          action={
+            <Button
+              variant="ghost"
+              className={styles.refreshButton}
+              onClick={onRefresh}
+              disabled={disabled}
+              aria-label={refreshLabel}
+              title={refreshLabel}
+            >
+              <svg
+                className={`${styles.refreshIcon} ${loading ? styles.refreshSpinner : ''}`}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M20 11a8 8 0 0 0-14.9-4M4 4v4h4" />
+                <path d="M4 13a8 8 0 0 0 14.9 4M20 20v-4h-4" />
+              </svg>
+            </Button>
+          }
         />
-        <Button variant="secondary" onClick={onRefresh} disabled={disabled}>
-          {loading ? 'Actualizando…' : 'Actualizar automáticamente'}
-        </Button>
       </div>
     </Card>
   );
@@ -190,25 +214,36 @@ export function RatesPanel() {
         {gap ? (
           <>
             <div className={styles.gapContent}>
-              <div className={styles.gapValues}>
-                <div>
+              <div className={styles.gapHeroRow}>
+                <div className={styles.heroMetric}>
                   <span className={styles.metricLabel}>Brecha porcentual</span>
-                  <strong className={styles.metricValue}>{formatPct(gap.pct, 2)}</strong>
+                  <strong
+                    className={`${styles.heroValue} ${
+                      gap.pct > PROFITABILITY_GREEN_MIN_PCT
+                        ? styles.gapHeroPositive
+                        : gap.pct > PROFITABILITY_YELLOW_MIN_PCT
+                          ? styles.gapHeroWarning
+                          : styles.gapHeroNegative
+                    }`}
+                  >
+                    {formatPct(gap.pct, 2)}
+                  </strong>
+                  <span className={styles.gapCaption}>vs BCV + 0,50%</span>
                 </div>
+                {gap.abnormal && <Badge tone="warning">Brecha anormalmente alta</Badge>}
+              </div>
+              <div className={styles.secondaryMetrics}>
                 <div>
                   <span className={styles.metricLabel}>Brecha absoluta</span>
                   <strong className={styles.metricValue}>{formatRate(gap.absoluteBs)} Bs.S</strong>
                 </div>
                 <div>
-                  <span className={styles.metricLabel}>BCV efectiva (con 0,50%)</span>
+                  <span className={styles.metricLabel}>BCV efectiva</span>
                   <strong className={styles.metricValue}>
                     {formatRate(gap.effectiveBcvRate)} Bs.S
                   </strong>
                 </div>
               </div>
-              {gap.abnormal && (
-                <Badge tone="warning">Brecha anormalmente alta</Badge>
-              )}
             </div>
             <p className={styles.gapHint}>
               La brecha se calcula contra la tasa BCV ajustada con la comisión de
@@ -216,7 +251,7 @@ export function RatesPanel() {
             </p>
           </>
         ) : (
-          <p className={styles.gapHint}>
+          <p className={`${styles.gapHint} ${styles.neutralHint}`}>
             Ingresa las tasas BCV y Binance para calcular la brecha cambiaria.
           </p>
         )}

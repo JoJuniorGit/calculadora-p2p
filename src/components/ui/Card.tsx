@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import styles from './Card.module.css';
 
 export interface CardProps {
@@ -6,15 +6,16 @@ export interface CardProps {
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }
 
-export function Card({ title, actions, children, className }: CardProps) {
+export function Card({ title, actions, children, className, style }: CardProps) {
   const titleId = useId();
   const hasTitle = title !== undefined && title !== null;
   const classes = [styles.card, className].filter(Boolean).join(' ');
 
   return (
-    <section className={classes} aria-labelledby={hasTitle ? titleId : undefined}>
+    <section className={classes} style={style} aria-labelledby={hasTitle ? titleId : undefined}>
       {(hasTitle || actions) && (
         <header className={styles.header}>
           {hasTitle && (

@@ -31,16 +31,39 @@
 }
 
 .primaryKpi {
-  border-color: var(--primary);
+  border-color: var(--primary-glow);
   background: var(--primary-soft);
+  box-shadow: 0 0 20px -14px var(--primary-glow);
+}
+
+.primaryKpi .kpiValue {
+  color: var(--primary);
+}
+
+.completedKpi {
+  border-color: var(--success-glow);
+  background: var(--success-soft);
+  box-shadow: 0 0 22px -14px var(--success-glow);
+}
+
+.completedKpi .kpiValue {
+  color: var(--success);
+  text-shadow: 0 0 16px var(--success-glow);
 }
 
 .cancelledKpi {
-  border-color: var(--warning);
-  background: var(--warning-soft);
+  border-color: var(--border);
+  background: var(--bg-subtle);
+}
+
+.cancelledKpi .kpiValue {
+  color: var(--text-muted);
 }
 
 .kpiLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   margin: 0;
   color: var(--text-muted);
   font-size: 0.86rem;
@@ -56,9 +79,7 @@
   overflow-wrap: anywhere;
 }
 
-.kpiHint,
 .kpiCount,
-.accountingNote,
 .dataHint {
   margin: 0;
   color: var(--text-muted);
@@ -70,10 +91,6 @@
 .kpiCount {
   color: var(--text);
   font-weight: 650;
-}
-
-.accountingNote {
-  margin-top: 0.8rem;
 }
 
 .filtersGrid {
@@ -158,6 +175,18 @@
   white-space: nowrap;
 }
 
+.recordsTable th.numericHeader {
+  text-align: right;
+}
+
+.recordsTable tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.recordsTable tbody tr:hover {
+  background: var(--bg-hover);
+}
+
 .recordsTable tbody tr:last-child td {
   border-bottom: 0;
 }
@@ -175,6 +204,7 @@
 }
 
 .numericCell {
+  text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -195,7 +225,8 @@
   min-width: 0;
 }
 
-.tableActions > button {
+.tableActions > .actionButton,
+.mobileActions > .actionButton {
   min-height: 34px;
   padding: 0.38rem 0.5rem;
   font-size: 0.78rem;
@@ -270,6 +301,7 @@
   margin: 0;
   font-size: 0.87rem;
   font-variant-numeric: tabular-nums;
+  text-align: right;
   overflow-wrap: anywhere;
 }
 

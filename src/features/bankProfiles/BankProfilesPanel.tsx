@@ -88,50 +88,69 @@ export function BankProfilesPanel() {
                   <Button variant="secondary" onClick={() => openEditForm(profile)}>
                     Editar
                   </Button>
-                  <Button variant="danger" onClick={() => setProfileToDelete(profile)}>
+                  <Button variant="dangerGhost" onClick={() => setProfileToDelete(profile)}>
                     Eliminar
                   </Button>
                 </>
               }
             >
-              <dl className={styles.profileDetails}>
-                <div>
-                  <dt>Comisión de tarjeta</dt>
-                  <dd>
-                    {formatPct(profile.cardCommissionPct)} · {cardBaseLabel(profile.cardCommissionBase)}
+              <dl className={styles.commissionGrid}>
+                <div className={styles.commissionTile}>
+                  <dt className={styles.commissionLabel}>Tarjeta</dt>
+                  <dd className={styles.commissionContent}>
+                    <strong className={styles.commissionValue}>{formatPct(profile.cardCommissionPct)}</strong>
+                    <span className={styles.commissionSubline}>
+                      {cardBaseLabel(profile.cardCommissionBase)}
+                    </span>
                   </dd>
                 </div>
-                <div>
-                  <dt>Depósito Binance</dt>
-                  <dd>
-                    {formatPct(profile.binanceDepositPct)} + {formatUsd(profile.binanceDepositFixedUsd)}
+                <div className={styles.commissionTile}>
+                  <dt className={styles.commissionLabel}>Binance</dt>
+                  <dd className={styles.commissionContent}>
+                    <strong className={styles.commissionValue}>
+                      {formatPct(profile.binanceDepositPct)} + {formatUsd(profile.binanceDepositFixedUsd)}
+                    </strong>
+                    <span className={styles.commissionSubline}>Porcentaje más cargo fijo por depósito</span>
                   </dd>
                 </div>
-                <div>
-                  <dt>Pago interbancario</dt>
-                  <dd>
-                    <Badge tone={profile.interbankEnabled ? 'success' : 'neutral'}>
-                      {profile.interbankEnabled ? 'Activo' : 'Inactivo'}
-                    </Badge>{' '}
-                    {formatPct(profile.interbankPct)} · {interbankBaseLabel(profile.interbankBase)}
+                <div className={styles.commissionTile}>
+                  <dt className={styles.commissionLabel}>Interbancario</dt>
+                  <dd className={styles.commissionContent}>
+                    <span className={styles.commissionStatusValue}>
+                      <Badge tone={profile.interbankEnabled ? 'success' : 'neutral'}>
+                        {profile.interbankEnabled ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                      <strong className={styles.commissionValue}>{formatPct(profile.interbankPct)}</strong>
+                    </span>
+                    <span className={styles.commissionSubline}>
+                      {interbankBaseLabel(profile.interbankBase)}
+                    </span>
                   </dd>
                 </div>
-                <div>
-                  <dt>IGTF</dt>
-                  <dd>
-                    <Badge tone={profile.igtfEnabled ? 'success' : 'neutral'}>
-                      {profile.igtfEnabled ? 'Activo' : 'Inactivo'}
-                    </Badge>{' '}
-                    {formatPct(profile.igtfPct)} · {igtfBaseLabel(profile.igtfBase)}
+                <div className={styles.commissionTile}>
+                  <dt className={styles.commissionLabel}>IGTF</dt>
+                  <dd className={styles.commissionContent}>
+                    <span className={styles.commissionStatusValue}>
+                      <Badge tone={profile.igtfEnabled ? 'success' : 'neutral'}>
+                        {profile.igtfEnabled ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                      <strong className={styles.commissionValue}>{formatPct(profile.igtfPct)}</strong>
+                    </span>
+                    <span className={styles.commissionSubline}>
+                      {igtfBaseLabel(profile.igtfBase)}
+                    </span>
                   </dd>
                 </div>
-                <div>
-                  <dt>Slippage</dt>
-                  <dd>
-                    <Badge tone={profile.slippageEnabled ? 'success' : 'neutral'}>
-                      {profile.slippageEnabled ? 'Activo' : 'Inactivo'}
-                    </Badge>{' '}
-                    {formatPct(profile.slippagePct)}
+                <div className={styles.commissionTile}>
+                  <dt className={styles.commissionLabel}>Slippage</dt>
+                  <dd className={styles.commissionContent}>
+                    <span className={styles.commissionStatusValue}>
+                      <Badge tone={profile.slippageEnabled ? 'success' : 'neutral'}>
+                        {profile.slippageEnabled ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                      <strong className={styles.commissionValue}>{formatPct(profile.slippagePct)}</strong>
+                    </span>
+                    <span className={styles.commissionSubline}>Ajuste sobre la tasa Binance P2P</span>
                   </dd>
                 </div>
               </dl>

@@ -101,17 +101,21 @@ export function SettingsPanel() {
             onChange={(enabled) => setDisclaimer({ enabled })}
             hint="El aviso está desactivado por defecto y solo se muestra cuando lo habilitas."
           />
-          <div className={styles.textareaField}>
-            <label className={fields.label} htmlFor={disclaimerTextId}>
-              Texto del aviso
-            </label>
-            <textarea
-              id={disclaimerTextId}
-              className={fields.textarea}
-              value={disclaimer.text}
-              onChange={(event) => setDisclaimer({ text: event.currentTarget.value })}
-            />
-          </div>
+          {disclaimer.enabled ? (
+            <div className={styles.textareaField}>
+              <label className={fields.label} htmlFor={disclaimerTextId}>
+                Texto del aviso
+              </label>
+              <textarea
+                id={disclaimerTextId}
+                className={fields.textarea}
+                value={disclaimer.text}
+                onChange={(event) => setDisclaimer({ text: event.currentTarget.value })}
+              />
+            </div>
+          ) : (
+            <p className={styles.hiddenNotice}>El aviso está oculto mientras esta opción esté desactivada.</p>
+          )}
         </div>
       </Card>
 
