@@ -140,6 +140,14 @@ export function PurchaseRowActions({
       : `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]}`
     : undefined;
 
+  const isLiquidation = nextStatus === 'completed';
+  const quickActionLabel = isLiquidation ? 'Liquidar operación' : 'Avanzar estado';
+
+  const handleQuickAction = (): void => {
+    if (open) onOpenChangeRef.current(false);
+    onAdvance();
+  };
+
   const menu =
     open && triggerVisible && typeof document !== 'undefined'
       ? createPortal(
@@ -187,31 +195,74 @@ export function PurchaseRowActions({
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        id={triggerId}
-        className={styles.trigger}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={menuId}
-        aria-label={`Acciones para ${purchaseLabel}`}
-        title="Acciones"
-        data-open={open}
-        onClick={() => onOpenChange(!open)}
-      >
-        <svg
-          className={styles.icon}
-          viewBox="0 0 16 16"
-          fill="currentColor"
-          aria-hidden="true"
-          focusable="false"
+      <div className={styles.actionGroup}>
+        {nextStatus !== null && (
+          <button
+            className={styles.quickAction}
+            type="button"
+            title={quickActionLabel}
+            aria-label={`${quickActionLabel} para ${purchaseLabel}`}
+            data-kind={isLiquidation ? 'complete' : 'advance'}
+            onClick={handleQuickAction}
+          >
+            {isLiquidation ? (
+              <svg
+                className={styles.icon}
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M3.5 8.5l3 3 6-6" />
+              </svg>
+            ) : (
+              <svg
+                className={styles.icon}
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M3 8h9" />
+                <path d="M8.5 4.5L12 8l-3.5 3.5" />
+              </svg>
+            )}
+          </button>
+        )}
+        <button
+          ref={triggerRef}
+          id={triggerId}
+          className={styles.trigger}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={menuId}
+          aria-label={`Acciones para ${purchaseLabel}`}
+          title="Acciones"
+          data-open={open}
+          onClick={() => onOpenChange(!open)}
         >
-          <circle cx="8" cy="3" r="1.25" />
-          <circle cx="8" cy="8" r="1.25" />
-          <circle cx="8" cy="13" r="1.25" />
-        </svg>
-      </button>
+          <svg
+            className={styles.icon}
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <circle cx="8" cy="3" r="1.25" />
+            <circle cx="8" cy="8" r="1.25" />
+            <circle cx="8" cy="13" r="1.25" />
+          </svg>
+        </button>
+      </div>
       {menu}
     </>
   );

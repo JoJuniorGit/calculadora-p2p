@@ -191,13 +191,6 @@
   border-bottom: 0;
 }
 
-.tableCaption {
-  padding: 0 0 0.5rem;
-  color: var(--text-muted);
-  text-align: left;
-  font-size: 0.82rem;
-}
-
 .bankCell {
   max-width: 11rem;
   overflow-wrap: anywhere;
@@ -207,6 +200,10 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.emphasisCell {
+  font-weight: 600;
 }
 
 .positiveValue {

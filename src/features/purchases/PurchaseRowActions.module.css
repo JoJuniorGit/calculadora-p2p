@@ -1,3 +1,9 @@
+.actionGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
 .trigger {
   display: inline-grid;
   flex: 0 0 32px;
@@ -26,6 +32,36 @@
   background: var(--primary-soft);
   box-shadow: 0 0 0 2px var(--primary-glow);
   color: var(--primary);
+}
+
+.quickAction {
+  display: inline-grid;
+  flex: 0 0 32px;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+
+.quickAction:hover {
+  background: var(--bg-hover);
+  color: var(--primary);
+}
+
+.quickAction[data-kind='complete']:hover {
+  border-color: var(--success-glow);
+  background: var(--success-soft);
+  box-shadow: 0 0 0 2px var(--success-glow);
+  color: var(--success);
 }
 
 .icon {

@@ -10,7 +10,7 @@ import {
   parsePurchasesCsv,
   parsePurchasesJson,
 } from '../../storage/exportImport';
-import { formatBs, formatDate, formatPct, formatUsd } from '../../utils/format';
+import { formatAmount, formatBs, formatDate, formatPct } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -307,16 +307,15 @@ export function PurchasesPanel() {
         ) : (
           <>
             <div className={styles.tableWrap}>
-              <table className={styles.recordsTable}>
-                <caption className={styles.tableCaption}>Compras que coinciden con los filtros</caption>
+              <table className={styles.recordsTable} aria-label="Compras registradas">
                 <thead>
                   <tr>
                     <th scope="col">Fecha</th>
                     <th scope="col">Banco</th>
-                    <th scope="col" className={styles.numericHeader}>Invertido</th>
+                    <th scope="col" className={styles.numericHeader}>Invertido (Bs.S)</th>
                     <th scope="col" className={styles.numericHeader}>USD depositados</th>
                     <th scope="col" className={styles.numericHeader}>Bs.S de salida</th>
-                    <th scope="col" className={styles.numericHeader}>Utilidad</th>
+                    <th scope="col" className={styles.numericHeader}>Utilidad (Bs.S)</th>
                     <th scope="col" className={styles.numericHeader}>ROI</th>
                     <th scope="col">Estado</th>
                     <th scope="col" className={styles.actionsCell}>Acciones</th>
@@ -330,13 +329,13 @@ export function PurchasesPanel() {
                       <tr key={purchase.id}>
                         <td>{formatDate(purchase.createdAt)}</td>
                         <td className={styles.bankCell}>{purchase.profileName}</td>
-                        <td className={styles.numericCell}>{formatBs(purchase.amountBs)}</td>
-                        <td className={styles.numericCell}>{formatUsd(purchase.usdDeposited)}</td>
-                        <td className={styles.numericCell}>{formatBs(outcome.bsOut)}</td>
-                        <td className={`${styles.numericCell} ${outcome.profitBs < 0 ? styles.negativeValue : styles.positiveValue}`}>
-                          {formatBs(outcome.profitBs)}
+                        <td className={styles.numericCell}>{formatAmount(purchase.amountBs)}</td>
+                        <td className={styles.numericCell}>{formatAmount(purchase.usdDeposited)}</td>
+                        <td className={styles.numericCell}>{formatAmount(outcome.bsOut)}</td>
+                        <td className={`${styles.numericCell} ${styles.emphasisCell} ${outcome.profitBs < 0 ? styles.negativeValue : styles.positiveValue}`}>
+                          {formatAmount(outcome.profitBs)}
                         </td>
-                        <td className={styles.numericCell}>{formatPct(outcome.roiPct)}</td>
+                        <td className={`${styles.numericCell} ${styles.emphasisCell}`}>{formatPct(outcome.roiPct)}</td>
                         <td><StatusBadge status={purchase.status} /></td>
                         <td className={styles.actionsCell}>
                           <PurchaseRowActions
@@ -385,16 +384,16 @@ export function PurchasesPanel() {
                       </div>
                     </header>
                     <dl className={styles.mobileDetails}>
-                      <div><dt>Invertido</dt><dd>{formatBs(purchase.amountBs)}</dd></div>
-                      <div><dt>USD depositados</dt><dd>{formatUsd(purchase.usdDeposited)}</dd></div>
-                      <div><dt>Bs.S de salida</dt><dd>{formatBs(outcome.bsOut)}</dd></div>
+                      <div><dt>Invertido (Bs.S)</dt><dd>{formatAmount(purchase.amountBs)}</dd></div>
+                      <div><dt>USD depositados</dt><dd>{formatAmount(purchase.usdDeposited)}</dd></div>
+                      <div><dt>Bs.S de salida</dt><dd>{formatAmount(outcome.bsOut)}</dd></div>
                       <div>
-                        <dt>Utilidad</dt>
-                        <dd className={outcome.profitBs < 0 ? styles.negativeValue : styles.positiveValue}>
-                          {formatBs(outcome.profitBs)}
+                        <dt>Utilidad (Bs.S)</dt>
+                        <dd className={`${styles.emphasisCell} ${outcome.profitBs < 0 ? styles.negativeValue : styles.positiveValue}`}>
+                          {formatAmount(outcome.profitBs)}
                         </dd>
                       </div>
-                      <div><dt>ROI</dt><dd>{formatPct(outcome.roiPct)}</dd></div>
+                      <div><dt>ROI</dt><dd className={styles.emphasisCell}>{formatPct(outcome.roiPct)}</dd></div>
                     </dl>
                   </article>
                 );

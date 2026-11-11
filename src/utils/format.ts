@@ -19,12 +19,17 @@ const dateFormatter = new Intl.DateTimeFormat('es-VE', {
   dateStyle: 'medium',
 });
 
+/** Numeric amount without a currency suffix, for headers that already state the currency. */
+export function formatAmount(value: number): string {
+  return amountFormatter.format(value);
+}
+
 export function formatBs(value: number): string {
-  return `${amountFormatter.format(value)} Bs.S`;
+  return `${formatAmount(value)} Bs.S`;
 }
 
 export function formatUsd(value: number): string {
-  return `${amountFormatter.format(value)} USD`;
+  return `${formatAmount(value)} USD`;
 }
 
 export function formatPct(value: number, digits = 2): string {
