@@ -30,6 +30,7 @@ La app es instalable desde el navegador:
 - **iOS/Safari:** Compartir → Agregar a inicio.
 - Una vez instalada, el shell carga sin conexión. Las APIs de tasas se consultan en modo red; el histórico usa la caché local de 90 días.
 - Las actualizaciones se avisan dentro de la app y no recargan la página automáticamente.
+- Los iconos PWA se regeneran con `npm run generate-pwa-assets`; usan fondo azul full-bleed para que las máscaras redondas de Android no muestren bandas blancas.
 
 Para probar el service worker en local, usá `npm run build && npm run preview`. El service worker requiere HTTPS o `localhost`; una IP de LAN por HTTP no alcanza.
 
