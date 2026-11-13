@@ -1,7 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import type { PurchaseFilters, PurchaseRecord, PurchaseStatus } from '../../domain/types';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
+import type { PurchaseFilters, PurchaseRecord, PurchaseStatus, TableColumnKey } from '../../domain/types';
 import { getNextStatuses, PURCHASE_STATUS_LABELS } from '../../domain/purchases';
 import { computeKpis } from '../../domain/kpis';
+import {
+  clampTableColumnWidth,
+  distributeTableWidths,
+  resolveTableColumnWidths,
+  TABLE_COLUMN_LIMITS,
+  TABLE_COLUMNS,
+} from '../../domain/tableColumns';
 import { useAppStore } from '../../store/useAppStore';
 import {
   createPurchasesCsvExport,
@@ -51,6 +67,19 @@ interface PaginationProps {
   label: string;
 }
 
+/** Page numbers around the current page: up to two behind and two ahead. */
+function getPageWindow(page: number, totalPages: number): number[] {
+  const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+  const end = Math.min(totalPages, start + 4);
+  const pages: number[] = [];
+
+  for (let candidate = start; candidate <= end; candidate += 1) {
+    pages.push(candidate);
+  }
+
+  return pages;
+}
+
 function Pagination({
   page,
   totalPages,
@@ -58,30 +87,106 @@ function Pagination({
   onPageChange,
   label,
 }: PaginationProps) {
+  const [jumpValue, setJumpValue] = useState('');
+
   if (totalItems === 0) return null;
 
+  const pages = getPageWindow(page, totalPages);
+
+  const goTo = (target: number): void => {
+    const clamped = Math.min(totalPages, Math.max(1, target));
+    if (clamped !== page) onPageChange(clamped);
+  };
+
+  const handleJump = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const target = Number.parseInt(jumpValue, 10);
+    if (Number.isFinite(target)) goTo(target);
+    setJumpValue('');
+  };
+
   return (
-    <div className={styles.pagination} aria-label={label}>
-      <span className={styles.paginationInfo} aria-live="polite">
-        Página {page} de {totalPages}
-      </span>
+    <nav className={styles.pagination} aria-label={label}>
       <div className={styles.paginationActions}>
         <Button
           variant="secondary"
+          className={styles.paginationArrow}
           disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
+          onClick={() => goTo(1)}
+          aria-label="Primera página"
+          title="Primera página"
         >
-          Anterior
+          «
         </Button>
         <Button
           variant="secondary"
-          disabled={page >= totalPages}
-          onClick={() => onPageChange(page + 1)}
+          className={styles.paginationArrow}
+          disabled={page <= 1}
+          onClick={() => goTo(page - 1)}
+          aria-label="Página anterior"
+          title="Página anterior"
         >
-          Siguiente
+          ‹
         </Button>
+        <span className={styles.paginationPages}>
+          {pages.map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              className={styles.paginationPage}
+              aria-current={candidate === page ? 'page' : undefined}
+              aria-label={`Página ${candidate}`}
+              onClick={() => goTo(candidate)}
+            >
+              {candidate}
+            </button>
+          ))}
+        </span>
+        <Button
+          variant="secondary"
+          className={styles.paginationArrow}
+          disabled={page >= totalPages}
+          onClick={() => goTo(page + 1)}
+          aria-label="Página siguiente"
+          title="Página siguiente"
+        >
+          ›
+        </Button>
+        <Button
+          variant="secondary"
+          className={styles.paginationArrow}
+          disabled={page >= totalPages}
+          onClick={() => goTo(totalPages)}
+          aria-label="Última página"
+          title="Última página"
+        >
+          »
+        </Button>
+        <span className={styles.paginationInfo} aria-live="polite">
+          Página {page} de {totalPages}
+        </span>
+        <form className={styles.paginationJump} onSubmit={handleJump}>
+          <input
+            className={styles.paginationJumpInput}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={totalPages}
+            value={jumpValue}
+            onChange={(event) => setJumpValue(event.target.value)}
+            placeholder={`${page} / ${totalPages}`}
+            aria-label={`Ir a página exacta (actual ${page} de ${totalPages})`}
+          />
+          <Button
+            type="submit"
+            variant="secondary"
+            className={styles.paginationJumpButton}
+          >
+            Ir
+          </Button>
+        </form>
       </div>
-    </div>
+    </nav>
   );
 }
 
@@ -93,8 +198,10 @@ interface PurchaseOutcome {
 
 function getPurchaseOutcome(purchase: PurchaseRecord): PurchaseOutcome | null {
   if (
-    (purchase.status === 'completed' || purchase.status === 'partial') &&
-    purchase.realizedRevenueVes !== undefined
+    purchase.realizedRevenueVes !== undefined &&
+    (purchase.status === 'completed' ||
+      purchase.status === 'partial' ||
+      (purchase.soldUsdt ?? 0) > 0)
   ) {
     const allocatedCost = purchase.allocatedCostVesTotal ?? 0;
     return {
@@ -130,8 +237,265 @@ function getSaleRate(purchase: PurchaseRecord): number {
     : snapshotRate;
 }
 
-function toUsdEquivalent(valueBs: number, rate: number): number {
-  return rate > 0 ? valueBs / rate : 0;
+type PnlState = 'projected' | 'partial' | 'realized';
+
+interface PurchasePnl {
+  state: PnlState;
+  /** Resultado in Bs.S: projected revenue or the realized revenue so far. */
+  resultVes: number;
+  /** Net profit in Bs.S: projected profit or the realized profit so far. */
+  profitVes: number;
+  roiPct: number;
+  /** USDT net worth selling in Binance, used by the projected result. */
+  netUsd?: number;
+  soldUsdt?: number;
+  totalUsdt?: number;
+  /** Share of the lot already sold, used by the partial subtitle. */
+  soldPct?: number;
+}
+
+function formatSignedPct(value: number): string {
+  const label = formatPct(value);
+  return value > 0 ? `+${label}` : label;
+}
+
+/** USDT net that reaches the Binance wallet, derived from the purchase snapshot. */
+function getProjectedNetUsd(purchase: PurchaseRecord, snapshotRate: number): number {
+  const snapshotNet = purchase.snapshot.usdtNet;
+  if (typeof snapshotNet === 'number' && snapshotNet > 0) return snapshotNet;
+  if (snapshotRate > 0 && purchase.estimatedBsOut > 0) {
+    return purchase.estimatedBsOut / snapshotRate;
+  }
+  return purchase.usdDeposited;
+}
+
+/**
+ * Floating PnL (projected at the current Binance rate) versus realized PnL
+ * (FIFO sales already executed). Cancelled purchases have no PnL at all.
+ */
+function getPurchasePnl(
+  purchase: PurchaseRecord,
+  currentBinanceRate: number,
+): PurchasePnl | null {
+  if (purchase.status === 'cancelled') return null;
+
+  const outcome = getPurchaseOutcome(purchase);
+  if (outcome) {
+    const soldUsdt = purchase.soldUsdt ?? 0;
+    const totalUsdt = purchase.initialBinanceUsdt ?? purchase.usdDeposited;
+    return {
+      state: purchase.status === 'completed' ? 'realized' : 'partial',
+      resultVes: outcome.bsOut,
+      profitVes: outcome.profitBs,
+      roiPct: outcome.roiPct,
+      soldUsdt,
+      totalUsdt,
+      soldPct: totalUsdt > 0 ? (soldUsdt / totalUsdt) * 100 : 0,
+    };
+  }
+
+  const snapshotRate = getSaleRate(purchase);
+  const rate = currentBinanceRate > 0 ? currentBinanceRate : snapshotRate;
+  const netUsd = getProjectedNetUsd(purchase, snapshotRate);
+  const resultVes = netUsd * rate;
+  const profitVes = resultVes - purchase.totalCostBs;
+
+  return {
+    state: 'projected',
+    resultVes,
+    profitVes,
+    roiPct: purchase.totalCostBs > 0 ? (profitVes / purchase.totalCostBs) * 100 : 0,
+    netUsd,
+  };
+}
+
+function renderResultCell(pnl: PurchasePnl | null): ReactNode {
+  if (!pnl) return null;
+
+  if (pnl.state === 'projected') {
+    return (
+      <span
+        className={styles.numericStack}
+        title="Resultado estimado: proyección con la tasa Binance actual. La venta aún no se ejecutó."
+      >
+        <span className={`${styles.primaryAmount} ${styles.projectedValue}`}>
+          ~ {formatAmount(pnl.resultVes)}
+        </span>
+        <span className={`${styles.pnlNote} ${styles.projectedNote}`}>
+          ~ {formatAmount(pnl.netUsd ?? 0)} USD netos
+        </span>
+      </span>
+    );
+  }
+
+  if (pnl.state === 'partial') {
+    return (
+      <span className={styles.numericStack}>
+        <span className={`${styles.primaryAmount} ${styles.realizedPartialValue}`}>
+          {formatAmount(pnl.resultVes)}
+        </span>
+        <span className={`${styles.pnlNote} ${styles.partialNote}`}>
+          Parcial ({Math.round(pnl.soldPct ?? 0)}%) · {formatSignedPct(pnl.roiPct)}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={styles.numericStack}
+      title="Resultado real: Bs.S efectivamente recibidos por las ventas FIFO."
+    >
+      <span className={`${styles.primaryAmount} ${styles.realizedValue}`}>
+        {formatAmount(pnl.resultVes)}
+      </span>
+      <span
+        className={`${styles.pnlNote} ${
+          pnl.profitVes < 0 ? styles.realizedNoteNegative : styles.realizedNote
+        }`}
+      >
+        <span aria-hidden="true">✓</span> Real · {formatSignedPct(pnl.roiPct)}
+      </span>
+    </span>
+  );
+}
+
+function renderProfitCell(pnl: PurchasePnl | null): ReactNode {
+  if (!pnl) return null;
+  const tone = pnl.profitVes < 0 ? styles.negativeValue : styles.positiveValue;
+
+  if (pnl.state === 'projected') {
+    return (
+      <span
+        className={styles.numericStack}
+        title="Ganancia estimada: proyección no ejecutada, calculada con la tasa Binance actual."
+      >
+        <span className={`${styles.primaryAmount} ${styles.projectedValue}`}>
+          ~ {formatAmount(pnl.profitVes)}
+        </span>
+        <span className={`${styles.pnlNote} ${styles.projectedNote}`}>
+          Est. · {formatPct(pnl.roiPct)}
+        </span>
+      </span>
+    );
+  }
+
+  if (pnl.state === 'partial') {
+    return (
+      <span className={styles.numericStack}>
+        <span className={`${styles.primaryAmount} ${styles.realizedPartialValue} ${styles.profitPartialValue} ${tone}`}>
+          {formatAmount(pnl.profitVes)}
+        </span>
+        <span className={`${styles.pnlNote} ${styles.partialNote}`}>
+          Parcial ({Math.round(pnl.soldPct ?? 0)}%) · {formatSignedPct(pnl.roiPct)}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={styles.numericStack}
+      title={
+        pnl.profitVes < 0
+          ? 'Pérdida realizada: resultado neto negativo confirmado por las ventas FIFO.'
+          : 'Ganancia realizada: beneficio neto confirmado por las ventas FIFO.'
+      }
+    >
+      <span className={`${styles.primaryAmount} ${styles.realizedProfit} ${tone}`}>
+        {formatAmount(pnl.profitVes)}
+      </span>
+      <span
+        className={`${styles.pnlNote} ${
+          pnl.profitVes < 0 ? styles.realizedNoteNegative : styles.realizedNote
+        }`}
+      >
+        <span aria-hidden="true">✓</span> Real · {formatSignedPct(pnl.roiPct)}
+      </span>
+    </span>
+  );
+}
+
+interface ColumnResizerProps {
+  column: TableColumnKey;
+  width: number;
+  /** Converts pointer pixels into stored pixels when the table stretches. */
+  dragRatio: number;
+  onPreview: (width: number) => void;
+  onCommit: (width: number) => void;
+  onReset: () => void;
+  /** Reports the pointer X (viewport) while dragging so the table can draw a guide. */
+  onGuide: (clientX: number | null) => void;
+}
+
+function ColumnResizer({
+  column,
+  width,
+  dragRatio,
+  onPreview,
+  onCommit,
+  onReset,
+  onGuide,
+}: ColumnResizerProps) {
+  const limits = TABLE_COLUMN_LIMITS[column];
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const clampWidth = (value: number): number => clampTableColumnWidth(column, value);
+  const step = (delta: number): void => onCommit(clampWidth(width + delta));
+
+  const endDrag = (): void => {
+    dragRef.current = null;
+    document.body.classList.remove(styles.resizingActive);
+    onGuide(null);
+  };
+
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Ajustar ancho de la columna ${limits.label}`}
+      aria-valuemin={limits.min}
+      aria-valuemax={limits.max}
+      aria-valuenow={width}
+      tabIndex={0}
+      title="Arrastra o usa las flechas para ajustar el ancho; doble clic para restablecer"
+      className={styles.columnResizer}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        dragRef.current = { startX: event.clientX, startWidth: width };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        document.body.classList.add(styles.resizingActive);
+        onGuide(event.clientX);
+      }}
+      onPointerMove={(event) => {
+        const drag = dragRef.current;
+        if (!drag) return;
+        onGuide(event.clientX);
+        onPreview(
+          clampWidth(drag.startWidth + (event.clientX - drag.startX) * dragRatio),
+        );
+      }}
+      onPointerUp={(event) => {
+        const drag = dragRef.current;
+        if (!drag) return;
+        onCommit(
+          clampWidth(drag.startWidth + (event.clientX - drag.startX) * dragRatio),
+        );
+        endDrag();
+      }}
+      onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          step(-8);
+        } else if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          step(8);
+        }
+      }}
+      onDoubleClick={onReset}
+    />
+  );
 }
 
 function getStatusInventoryNote(
@@ -256,6 +620,20 @@ export function PurchasesPanel() {
   const deletePurchase = useAppStore((state) => state.deletePurchase);
   const deleteSale = useAppStore((state) => state.deleteSale);
   const importPurchases = useAppStore((state) => state.importPurchases);
+  const tableColumnWidths = useAppStore((state) => state.tableColumnWidths);
+  const setTableColumnWidth = useAppStore((state) => state.setTableColumnWidth);
+  const currentBinanceRate = useAppStore((state) => state.rates.binance.value);
+
+  const [previewColumnWidth, setPreviewColumnWidth] = useState<{
+    column: TableColumnKey;
+    width: number;
+  } | null>(null);
+  const [resizeGuide, setResizeGuide] = useState<number | null>(null);
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const resolvedColumnWidths = useMemo(
+    () => resolveTableColumnWidths(tableColumnWidths),
+    [tableColumnWidths],
+  );
 
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [accreditationTargetId, setAccreditationTargetId] = useState<string | null>(null);
@@ -294,6 +672,20 @@ export function PurchasesPanel() {
     () => filterPurchases(purchases, filters),
     [filters, purchases],
   );
+  const [availableTableWidth, setAvailableTableWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const node = tableWrapRef.current;
+    if (!node) return undefined;
+
+    const measure = (): void => setAvailableTableWidth(node.clientWidth);
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [recordView, filteredPurchases.length]);
   const purchaseTotalPages = Math.max(
     1,
     Math.ceil(filteredPurchases.length / PURCHASE_PAGE_SIZE),
@@ -339,6 +731,54 @@ export function PurchasesPanel() {
     { value: 'all', label: 'Todos' },
     ...profileNames.map((name) => ({ value: name, label: name })),
   ];
+
+  const columnWidth = (column: TableColumnKey): number =>
+    previewColumnWidth?.column === column
+      ? previewColumnWidth.width
+      : resolvedColumnWidths[column];
+
+  const renderedWidths = useMemo(() => {
+    const baseWidths = { ...resolvedColumnWidths };
+    if (previewColumnWidth) {
+      baseWidths[previewColumnWidth.column] = previewColumnWidth.width;
+    }
+    return distributeTableWidths(baseWidths, availableTableWidth);
+  }, [availableTableWidth, previewColumnWidth, resolvedColumnWidths]);
+
+  // While the table stretches, pointer pixels are smaller than stored pixels:
+  // dragging one column shrinks the other four' share of the spare room.
+  const dragRatio = renderedWidths.fillable
+    ? (TABLE_COLUMNS.length - 1) / (TABLE_COLUMNS.length - 2)
+    : 1;
+
+  const commitColumnWidth = (column: TableColumnKey, width: number): void => {
+    setTableColumnWidth(column, width);
+    setPreviewColumnWidth(null);
+  };
+
+  const handleResizeGuide = (clientX: number | null): void => {
+    if (clientX === null) {
+      setResizeGuide(null);
+      return;
+    }
+    const rect = tableWrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setResizeGuide(clientX - rect.left);
+  };
+
+  const tableWidth = renderedWidths.totalWidth;
+
+  const renderColumnResizer = (column: TableColumnKey) => (
+    <ColumnResizer
+      column={column}
+      width={columnWidth(column)}
+      dragRatio={dragRatio}
+      onPreview={(width) => setPreviewColumnWidth({ column, width })}
+      onCommit={(width) => commitColumnWidth(column, width)}
+      onReset={() => commitColumnWidth(column, TABLE_COLUMN_LIMITS[column].default)}
+      onGuide={handleResizeGuide}
+    />
+  );
 
   const handleExport = (format: 'json' | 'csv'): void => {
     setDataNotice(null);
@@ -647,43 +1087,73 @@ export function PurchasesPanel() {
           />
         ) : (
           <>
-            <div className={styles.tableWrap}>
-              <table className={styles.recordsTable} aria-label="Compras registradas">
+            <div className={styles.tableWrap} ref={tableWrapRef}>
+              <table
+                className={styles.recordsTable}
+                style={{ width: `${tableWidth}px` }}
+                aria-label="Compras registradas"
+              >
+                <colgroup>
+                  {TABLE_COLUMNS.map((column) => (
+                    <col
+                      key={column}
+                      style={{ width: `${renderedWidths.widths[column]}px` }}
+                    />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th scope="col">Banco</th>
-                    <th scope="col" className={styles.numericHeader}>Inversión</th>
-                    <th scope="col" className={styles.numericHeader}>Resultado</th>
-                    <th scope="col" className={styles.numericHeader}>Ganancia</th>
-                    <th scope="col">Estado</th>
-                    <th scope="col" className={styles.actionsCell}>Acciones</th>
+                    <th scope="col">
+                      Banco
+                      {renderColumnResizer('bank')}
+                    </th>
+                    <th scope="col" className={styles.centerHeader}>
+                      Inversión (Bs.S)
+                      {renderColumnResizer('investment')}
+                    </th>
+                    <th scope="col" className={styles.centerHeader}>
+                      Resultado (Bs.S)
+                      {renderColumnResizer('outcome')}
+                    </th>
+                    <th scope="col" className={styles.centerHeader}>
+                      Ganancia (Bs.S)
+                      {renderColumnResizer('profit')}
+                    </th>
+                    <th scope="col" className={styles.centerHeader}>
+                      Estado
+                      {renderColumnResizer('status')}
+                    </th>
+                    <th scope="col" className={styles.actionsCell}>
+                      Acciones
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {pagedPurchases.map((purchase) => {
-                    const outcome = getPurchaseOutcome(purchase);
+                    const pnl = getPurchasePnl(purchase, currentBinanceRate);
                     const inventory = getInventoryData(purchase);
                     const inventoryNote = getStatusInventoryNote(purchase, inventory);
-                    const saleRate = getSaleRate(purchase);
                     const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled') ?? null;
                     return (
                       <tr key={purchase.id}>
                         <td className={styles.bankCell}>
-                          <span className={styles.bankName}>{purchase.profileName}</span>
-                          <time
-                            className={styles.purchaseDate}
-                            dateTime={getPurchaseDateTime(purchase)}
-                          >
-                            {getPurchaseDateLabel(purchase)}
-                          </time>
-                          <span className={styles.purchaseRateSource}>
-                            {getPurchaseRateSourceLabel(purchase)}
-                          </span>
+                          <div className={styles.bankCellContent}>
+                            <span className={styles.bankName}>{purchase.profileName}</span>
+                            <time
+                              className={styles.purchaseDate}
+                              dateTime={getPurchaseDateTime(purchase)}
+                            >
+                              {getPurchaseDateLabel(purchase)}
+                            </time>
+                            <span className={styles.purchaseRateSource}>
+                              {getPurchaseRateSourceLabel(purchase)}
+                            </span>
+                          </div>
                         </td>
-                        <td className={styles.numericCell}>
+                        <td className={`${styles.numericCell} ${styles.centerCell}`}>
                           <span className={styles.numericStack}>
                             <MoneyStack
-                              primary={formatBs(purchase.totalCostBs)}
+                              primary={formatAmount(purchase.totalCostBs)}
                               secondary={formatUsd(purchase.usdBought)}
                             />
                             {purchase.accreditationType === 'PARTIAL' && (
@@ -697,33 +1167,18 @@ export function PurchasesPanel() {
                           </span>
                         </td>
                         <td
-                          className={styles.numericCell}
-                          aria-label={outcome ? undefined : 'Resultado pendiente de venta'}
+                          className={`${styles.numericCell} ${styles.centerCell}`}
+                          aria-label={pnl ? undefined : 'Resultado no disponible'}
                         >
-                          {outcome && (
-                            <MoneyStack
-                              primary={formatBs(outcome.bsOut)}
-                              secondary={formatUsd(toUsdEquivalent(outcome.bsOut, saleRate))}
-                            />
-                          )}
+                          {renderResultCell(pnl)}
                         </td>
                         <td
-                          className={`${styles.numericCell} ${styles.emphasisCell}`}
-                          aria-label={
-                            purchase.status === 'completed' && outcome
-                              ? undefined
-                              : 'Ganancia disponible al completar la venta'
-                          }
+                          className={`${styles.numericCell} ${styles.emphasisCell} ${styles.centerCell}`}
+                          aria-label={pnl ? undefined : 'Ganancia no disponible'}
                         >
-                          {purchase.status === 'completed' && outcome && (
-                            <MoneyStack
-                              primary={formatUsd(toUsdEquivalent(outcome.profitBs, saleRate))}
-                              secondary={formatPct(outcome.roiPct)}
-                              tone={outcome.profitBs < 0 ? 'negative' : 'positive'}
-                            />
-                          )}
+                          {renderProfitCell(pnl)}
                         </td>
-                        <td>
+                        <td className={styles.statusColumn}>
                           <div className={styles.statusCell}>
                             <StatusBadge status={purchase.status} />
                             {inventoryNote && inventory && (
@@ -755,13 +1210,19 @@ export function PurchasesPanel() {
                   })}
                 </tbody>
               </table>
+              {resizeGuide !== null && (
+                <span
+                  className={styles.resizeGuide}
+                  style={{ left: `${resizeGuide}px` }}
+                  aria-hidden="true"
+                />
+              )}
             </div>
 
             <div className={styles.mobileList} aria-label="Registros de compras">
               {pagedPurchases.map((purchase) => {
-                const outcome = getPurchaseOutcome(purchase);
+                const pnl = getPurchasePnl(purchase, currentBinanceRate);
                 const inventory = getInventoryData(purchase);
-                const saleRate = getSaleRate(purchase);
                 const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled') ?? null;
                 return (
                   <article className={styles.mobileCard} key={purchase.id}>
@@ -792,10 +1253,10 @@ export function PurchasesPanel() {
                     </header>
                     <dl className={styles.mobileDetails}>
                       <div>
-                        <dt>Inversión</dt>
+                        <dt>Inversión (Bs.S)</dt>
                         <dd className={styles.mobileValueStack}>
                           <MoneyStack
-                            primary={formatBs(purchase.totalCostBs)}
+                            primary={formatAmount(purchase.totalCostBs)}
                             secondary={formatUsd(purchase.usdBought)}
                           />
                           {purchase.accreditationType === 'PARTIAL' && (
@@ -822,35 +1283,18 @@ export function PurchasesPanel() {
                         </dd>
                       </div>
                       <div>
-                        <dt>Resultado</dt>
-                        <dd
-                          aria-label={outcome ? undefined : 'Resultado pendiente de venta'}
-                        >
-                          {outcome && (
-                            <MoneyStack
-                              primary={formatBs(outcome.bsOut)}
-                              secondary={formatUsd(toUsdEquivalent(outcome.bsOut, saleRate))}
-                            />
-                          )}
+                        <dt>Resultado (Bs.S)</dt>
+                        <dd aria-label={pnl ? undefined : 'Resultado no disponible'}>
+                          {renderResultCell(pnl)}
                         </dd>
                       </div>
                       <div>
-                        <dt>Ganancia</dt>
+                        <dt>Ganancia (Bs.S)</dt>
                         <dd
                           className={styles.emphasisCell}
-                          aria-label={
-                            purchase.status === 'completed' && outcome
-                              ? undefined
-                              : 'Ganancia disponible al completar la venta'
-                          }
+                          aria-label={pnl ? undefined : 'Ganancia no disponible'}
                         >
-                          {purchase.status === 'completed' && outcome && (
-                            <MoneyStack
-                              primary={formatUsd(toUsdEquivalent(outcome.profitBs, saleRate))}
-                              secondary={formatPct(outcome.roiPct)}
-                              tone={outcome.profitBs < 0 ? 'negative' : 'positive'}
-                            />
-                          )}
+                          {renderProfitCell(pnl)}
                         </dd>
                       </div>
                     </dl>
@@ -924,13 +1368,15 @@ export function PurchasesPanel() {
                       </td>
                       <td className={salesStyles.numericCell}>{formatPct(sale.realizedRoiPercent)}</td>
                       <td className={salesStyles.numericCell}>{formatAmount(sale.walletBalanceAfterUsdt)}</td>
-                      <td className={salesStyles.saleActions}>
-                        <Button variant="secondary" onClick={() => setSelectedSaleId(sale.id)}>
-                          Ver
-                        </Button>
-                        <Button variant="dangerGhost" onClick={() => setDeleteSaleTargetId(sale.id)}>
-                          Eliminar
-                        </Button>
+                      <td>
+                        <div className={salesStyles.saleActions}>
+                          <Button variant="secondary" onClick={() => setSelectedSaleId(sale.id)}>
+                            Ver
+                          </Button>
+                          <Button variant="dangerGhost" onClick={() => setDeleteSaleTargetId(sale.id)}>
+                            Eliminar
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

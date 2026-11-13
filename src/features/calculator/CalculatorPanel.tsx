@@ -22,7 +22,8 @@ import {
   fetchHistoricalRateForDate,
   type HistoricalRateForDate,
 } from '../rates/ratesApi';
-import { useAutoRateRefresh } from '../rates/useAutoRateRefresh';
+import { describeRateFailure, useAutoRateRefresh } from '../rates/useAutoRateRefresh';
+import { formatRateAge, getRateAgeMs, isRateStale } from '../rates/rateStaleness';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -343,6 +344,30 @@ export function CalculatorPanel() {
   const autoRateRefresh = useAutoRateRefresh(
     isTodayDate && validAmount ? amountText.trim() : null,
   );
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const staleP2pWarning = useMemo(() => {
+    if (!isTodayDate) return null;
+    if (!isRateStale(rates.binance, nowMs)) return null;
+
+    const failure = autoRateRefresh.failures.find((item) => item.key === 'binance');
+    if (!failure) return null;
+
+    const ageMs = getRateAgeMs(rates.binance, nowMs);
+    const ageLabel = ageMs === null ? 'más de 10 minutos' : formatRateAge(ageMs);
+
+    return {
+      title: 'Tasas P2P desactualizadas',
+      message: `La tasa Binance P2P lleva ${ageLabel} sin actualizarse y el último intento automático falló: ${describeRateFailure(
+        failure,
+      )}. Se sigue usando el último valor guardado; revisa tu conexión y vuelve a intentarlo.`,
+    };
+  }, [autoRateRefresh.failures, isTodayDate, nowMs, rates.binance]);
 
   useEffect(() => {
     if (profiles.length === 0) {
@@ -724,6 +749,13 @@ export function CalculatorPanel() {
 
   return (
     <section className={styles.panel} aria-label="Calculadora de arbitraje">
+      {staleP2pWarning && (
+        <aside className={styles.staleRateNotice} role="alert">
+          <p className={styles.staleRateNoticeTitle}>{staleP2pWarning.title}</p>
+          <p>{staleP2pWarning.message}</p>
+        </aside>
+      )}
+
       {feedback && (
         <div
           className={feedback.tone === 'success' ? styles.successFeedback : styles.errorFeedback}
@@ -812,7 +844,7 @@ export function CalculatorPanel() {
               <NumberField
                 label={mode === 'bs' ? 'Monto a invertir' : 'Monto de USD a solicitar'}
                 name="calculator-amount"
-                value={amountText}
+                value={amountText.trim() === '' ? '0' : amountText}
                 onChange={(value) => {
                   clearFeedback();
                   setAmountText(value);
@@ -820,7 +852,6 @@ export function CalculatorPanel() {
                 }}
                 suffix={mode === 'bs' ? 'Bs.S' : 'USD'}
                 step="any"
-                placeholder={mode === 'bs' ? 'Ej.: 2500,00' : 'Ej.: 100,00'}
                 error={amountTouched ? calculation.amountError : undefined}
                 hint={amountHint}
               />
@@ -931,7 +962,7 @@ export function CalculatorPanel() {
               )}
             </dl>
 
-            {autoRateRefresh.message && (
+            {autoRateRefresh.message && !staleP2pWarning && (
               <p
                 className={`${styles.autoRateStatus} ${
                   autoRateRefresh.status === 'error' ? styles.autoRateStatusError : ''
@@ -1105,7 +1136,7 @@ export function CalculatorPanel() {
       {confirmRegisterOpen && calculation.input && result && (
         <Modal
           open
-          title="Confirmar registro de compra"
+          title="Confirmar Registro de Compra"
           onClose={() => setConfirmRegisterOpen(false)}
         >
           <div className={styles.confirmContent}>
@@ -1118,57 +1149,25 @@ export function CalculatorPanel() {
                 <dd>{selectedProfile?.name ?? '-'}</dd>
               </div>
               <div>
-                <dt>Fecha de compra</dt>
+                <dt>Fecha</dt>
                 <dd>{formatDateOnly(purchaseDate)}</dd>
               </div>
               <div>
-                <dt>Fuente de tasas</dt>
-                <dd>{rateSourceLabel}</dd>
-              </div>
-              <div>
-                <dt>Tasa BCV aplicada</dt>
-                <dd>{formatRate(calculation.input.bcvRate)} Bs.S/USD</dd>
-              </div>
-              <div>
-                <dt>Tasa Binance P2P aplicada</dt>
-                <dd>{formatRate(calculation.input.binanceRate)} Bs.S/USD</dd>
-              </div>
-              <div>
-                <dt>Modo de entrada</dt>
-                <dd>{mode === 'bs' ? 'Invertir Bs.S' : 'Solicitar USD'}</dd>
-              </div>
-              <div>
-                <dt>Monto ingresado</dt>
-                <dd>{mode === 'bs' ? formatBs(calculation.input.amount) : formatUsd(calculation.input.amount)}</dd>
-              </div>
-              <div>
                 <dt>Inversión</dt>
-                <dd>{formatBs(result.bcvPurchaseBs)}</dd>
-              </div>
-              <div>
-                <dt>Costo total</dt>
                 <dd>{formatBs(result.totalCostBs)}</dd>
               </div>
               <div>
-                <dt>Retorno estimado</dt>
-                <dd>{formatBs(result.bsOut)}</dd>
-              </div>
-              <div>
-                <dt>USD adjudicados</dt>
+                <dt>USD comprados</dt>
                 <dd>{formatUsd(result.usdBought)}</dd>
               </div>
               <div>
-                <dt>Monto a Binance</dt>
-                <dd>{formatUsd(result.usdForBinance)}</dd>
+                <dt>Retorno Esperado</dt>
+                <dd>{formatBs(result.bsOut)}</dd>
               </div>
               <div>
-                <dt>Comisión fija P2P</dt>
-                <dd>{formatUsd(result.binanceFixedFeeUsd)} · mínimo {formatUsd(DEFAULT_P2P_FIXED_FEE_USDT)}</dd>
-              </div>
-              <div>
-                <dt>Utilidad estimada</dt>
+                <dt>Ganancia</dt>
                 <dd className={result.netProfitBs < 0 ? styles.negativeValue : styles.positiveValue}>
-                  {formatBs(result.netProfitBs)} · {formatPct(result.roiPct, 2)}
+                  {formatBs(result.netProfitBs)} · ROI {formatPct(result.roiPct, 2)}
                 </dd>
               </div>
             </dl>

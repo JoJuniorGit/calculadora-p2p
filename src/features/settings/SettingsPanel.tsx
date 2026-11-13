@@ -39,6 +39,7 @@ export function SettingsPanel() {
   const sales = useAppStore((state) => state.sales);
   const disclaimer = useAppStore((state) => state.disclaimer);
   const theme = useAppStore((state) => state.theme);
+  const tableColumnWidths = useAppStore((state) => state.tableColumnWidths);
   const importConfig = useAppStore((state) => state.importConfig);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pendingConfig, setPendingConfig] = useState<PersistedState | null>(null);
@@ -94,6 +95,7 @@ export function SettingsPanel() {
         sales,
         disclaimer,
         theme,
+        tableColumnWidths,
       };
       const content = createConfigJsonExport(config);
       downloadTextFile('calculadora-p2p-config.json', content, 'application/json;charset=utf-8');

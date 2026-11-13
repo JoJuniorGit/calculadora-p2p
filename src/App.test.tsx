@@ -66,12 +66,12 @@ describe('client render smoke', () => {
     expect(container.textContent).toContain('Calculadora P2P');
     const nav = container.querySelector('nav[aria-label="Navegación principal"]');
     expect(nav).not.toBeNull();
-    expect(nav?.querySelectorAll('button')).toHaveLength(4);
+    expect(nav?.querySelectorAll('button')).toHaveLength(5);
     expect(container.querySelector('aside[aria-label="Menú lateral"]')).toBeNull();
     expect(container.querySelector('button[aria-controls="app-sidebar"]')).toBeNull();
 
     expect(container.querySelector('[aria-current="page"]')?.textContent?.trim()).toBe(
-      'Calculadora',
+      'Convertir',
     );
 
     clickButton('Calculadora');
@@ -85,6 +85,11 @@ describe('client render smoke', () => {
     expect(container.textContent).toContain('Ventas');
     expect(container.textContent).toContain('Todavía no hay compras registradas');
     expect(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)).toBe('records');
+
+    clickButton('Convertir');
+    expect(container.textContent).toContain('Conversor de Tasas');
+    expect(container.textContent).toContain('Equivalencia y poder de compra');
+    expect(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)).toBe('converter');
   });
 
   it('shows the responsibility notice only on the first visit', () => {

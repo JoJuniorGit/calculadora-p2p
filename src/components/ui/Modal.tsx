@@ -55,6 +55,7 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
         tabIndex={-1}
       >
         <header className={styles.header}>
+          <span className={styles.titleSpacer} aria-hidden="true" />
           <h2 id={titleId} className={styles.title}>
             {title}
           </h2>

@@ -166,34 +166,97 @@
 }
 
 .tableWrap {
+  position: relative;
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
 }
 
 .recordsTable {
-  min-width: 1000px;
+  table-layout: fixed;
   font-size: 0.84rem;
 }
 
-.recordsTable th,
-.recordsTable td {
-  padding: 0.7rem 0.55rem;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: middle;
-}
-
 .recordsTable th {
+  position: relative;
   background: var(--bg-subtle);
   color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 650;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.recordsTable th.numericHeader {
-  text-align: right;
+.columnResizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.columnResizer::after {
+  content: '';
+  position: absolute;
+  top: 22%;
+  right: 0;
+  bottom: 22%;
+  width: 1px;
+  background: var(--border-strong);
+  transition: background-color 120ms ease;
+}
+
+.columnResizer:hover::after,
+.columnResizer:focus-visible::after {
+  background: var(--primary);
+}
+
+.columnResizer:focus-visible {
+  border-radius: 999px;
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Vertical guide drawn while dragging so the target column edge stays visible. */
+.resizeGuide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 1px;
+  background: var(--primary);
+  pointer-events: none;
+}
+
+/* Applied to <body> while dragging to block text selection everywhere. */
+.resizingActive {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.recordsTable th,
+.recordsTable td {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.recordsTable th.centerHeader,
+.recordsTable td.statusColumn,
+.recordsTable td.centerCell {
+  text-align: center;
+}
+
+/* Center the stacked amount lines inside the centered columns. */
+.recordsTable td.centerCell .numericStack,
+.recordsTable td.centerCell .currencyStack {
+  justify-items: center;
 }
 
 .recordsTable tbody tr {
@@ -209,10 +272,15 @@
 }
 
 .bankCell {
+  overflow-wrap: anywhere;
+}
+
+/* The grid layout lives on an inner wrapper: a display override on the <td>
+   detaches the cell from the table layout and breaks its bottom border. */
+.bankCellContent {
   display: grid;
   gap: 0.15rem;
-  max-width: 11rem;
-  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .bankName {
@@ -229,10 +297,12 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .statusCell {
   display: grid;
+  justify-items: center;
   gap: 0.2rem;
   min-width: 0;
 }
@@ -283,6 +353,59 @@
   white-space: nowrap;
 }
 
+/* Floating PnL: yellow projections, amber partials and green realized values. */
+.projectedValue {
+  color: var(--warning);
+  font-weight: 500;
+}
+
+.pnlNote {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectedNote {
+  color: var(--warning);
+}
+
+.realizedPartialValue {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.profitPartialValue {
+  font-weight: 600;
+}
+
+.partialNote {
+  color: var(--warning);
+}
+
+.realizedValue {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.realizedProfit {
+  font-weight: 700;
+}
+
+.realizedNote {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.realizedNoteNegative {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .partialBadge {
   display: inline-flex;
   align-items: center;
@@ -315,6 +438,7 @@
 
 .recordsTable th.actionsCell,
 .recordsTable td.actionsCell {
+  padding-inline: 0.35rem;
   text-align: right;
 }
 
@@ -540,14 +664,64 @@
 
 .pagination {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
+  justify-content: center;
   min-width: 0;
   margin-top: 0.85rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--border);
+}
+
+.paginationActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.paginationActions .paginationArrow {
+  min-width: 2.2rem;
+  padding: 0 0.5rem;
+}
+
+.paginationPages {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.paginationPage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.paginationPage:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.paginationPage[aria-current='page'] {
+  border-color: var(--primary-glow);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 650;
+}
+
+.paginationPage:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .paginationInfo {
@@ -556,20 +730,55 @@
   font-variant-numeric: tabular-nums;
 }
 
-.paginationActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  min-width: 0;
+.paginationJump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.15rem;
 }
 
-@media (max-width: 480px) {
+.paginationJumpInput {
+  width: 4.6rem;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.paginationJumpInput:focus-visible {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.paginationActions .paginationJumpButton {
+  min-width: 2.6rem;
+  padding: 0 0.6rem;
+}
+
+@media (max-width: 560px) {
   .paginationActions {
+    flex-wrap: nowrap;
+    gap: 0.3rem;
     width: 100%;
   }
 
-  .paginationActions > button {
-    flex: 1 1 120px;
+  .paginationPages,
+  .paginationInfo {
+    display: none;
+  }
+
+  .paginationJump {
+    margin-left: 0;
+  }
+
+  .paginationJumpInput {
+    width: 4.2rem;
   }
 }
 
@@ -732,10 +941,6 @@
 
   .recordTab {
     min-height: 44px;
-  }
-
-  .pagination {
-    gap: 0.5rem;
   }
 }
 

@@ -24,7 +24,7 @@ function ratesWith(overrides: Partial<Rates> = {}): Rates {
 }
 
 describe('getRatesNeedingAutoRefresh', () => {
-  it('requests both rates when they are not configured', () => {
+  it('requests the missing rates when they are not configured', () => {
     const rates = ratesWith({
       bcv: { value: 0, updatedAt: null, source: 'manual' },
       binance: { value: 0, updatedAt: null, source: 'manual' },

@@ -16,7 +16,9 @@ const dateTimeFormatter = new Intl.DateTimeFormat('es-VE', {
 });
 
 const dateFormatter = new Intl.DateTimeFormat('es-VE', {
-  dateStyle: 'medium',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
 });
 
 /** Numeric amount without a currency suffix, for headers that already state the currency. */

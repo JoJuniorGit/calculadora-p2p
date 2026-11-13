@@ -56,6 +56,11 @@ beforeEach(() => {
     sales: [],
     profiles: [],
     filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
+    tableColumnWidths: {},
+    rates: {
+      bcv: { value: 0, updatedAt: null, source: 'manual' },
+      binance: { value: 0, updatedAt: null, source: 'manual' },
+    },
   });
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -110,6 +115,14 @@ function clickButton(text: string): void {
   });
 }
 
+function clickButtonByLabel(label: string): void {
+  const button = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  expect(button).not.toBeNull();
+  act(() => {
+    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
+
 function clickButtonStartingWith(text: string): void {
   const button = [...container.querySelectorAll('button')].find(
     (candidate) => candidate.textContent?.trim().startsWith(text),
@@ -147,29 +160,27 @@ describe('PurchasesPanel financial table', () => {
   it('shows USD/USDT as the primary amount and Bs.S as secondary', () => {
     expect(getHeaders()).toEqual([
       'Banco',
-      'Inversión',
-      'Resultado',
-      'Ganancia',
+      'Inversión (Bs.S)',
+      'Resultado (Bs.S)',
+      'Ganancia (Bs.S)',
       'Estado',
       'Acciones',
     ]);
 
     const cells = getDesktopCells();
-    expect(cells[1]).toContain('10.000,00 Bs.S');
+    expect(cells[1]).toContain('10.000,00');
     expect(cells[1]).toContain('250,00 USD');
-    expect(cells[1].indexOf('Bs.S')).toBeLessThan(cells[1].indexOf('USD'));
-    expect(cells[2]).toBe('');
-    expect(cells[3]).toBe('');
+    expect(cells[1].indexOf('10.000,00')).toBeLessThan(cells[1].indexOf('USD'));
+    expect(cells[2]).toContain('~ 11.730,00');
+    expect(cells[2]).toContain('~ 255,00 USD netos');
+    expect(cells[3]).toContain('~ 1.730,00');
+    expect(cells[3]).toContain('Est. · 17,30%');
     expect(cells[4]).toContain('En espera');
     expect(container.querySelector('caption')).toBeNull();
   });
 
   it('shows purchaseDate in both purchase views and keeps createdAt for legacy records', () => {
-    expect(formatDateOnly('2024-01-02')).toBe(
-      new Intl.DateTimeFormat('es-VE', { dateStyle: 'medium' }).format(
-        new Date(2024, 0, 2, 12),
-      ),
-    );
+    expect(formatDateOnly('2024-01-02')).toBe('02/01/2024');
     const datedPurchase = createPurchase({
       id: 'historical-purchase',
       createdAt: '2024-01-10T12:00:00.000Z',
@@ -214,12 +225,14 @@ describe('PurchasesPanel financial table', () => {
     expect(mobileCards[1]?.textContent).toContain('Legada');
   });
 
-  it('hides utility until completion and shows it after the sale', () => {
+  it('shows the realized PnL of the sold fraction until the purchase is completed', () => {
     act(() => {
       useAppStore.setState({
         purchases: [
           createPurchase({
             status: 'partial',
+            soldUsdt: 100,
+            initialBinanceUsdt: 250,
             realizedRevenueVes: 11_730,
             realizedProfitVes: 1_730,
             allocatedCostVesTotal: 10_000,
@@ -230,10 +243,10 @@ describe('PurchasesPanel financial table', () => {
     });
 
     let cells = getDesktopCells();
-    expect(cells[2]).toContain('11.730,00 Bs.S');
-    expect(cells[2]).toContain('255,00 USD');
-    expect(cells[2].indexOf('Bs.S')).toBeLessThan(cells[2].indexOf('USD'));
-    expect(cells[3]).toBe('');
+    expect(cells[2]).toContain('11.730,00');
+    expect(cells[2]).toContain('Parcial (40%) · +17,30%');
+    expect(cells[3]).toContain('1.730,00');
+    expect(cells[3]).toContain('Parcial (40%) · +17,30%');
     expect(cells[4]).toContain('Parcial');
 
     act(() => {
@@ -251,12 +264,9 @@ describe('PurchasesPanel financial table', () => {
     });
 
     cells = getDesktopCells();
-    expect(cells[2]).toContain('11.730,00 Bs.S');
-    expect(cells[2]).toContain('255,00 USD');
-    expect(cells[2].indexOf('Bs.S')).toBeLessThan(cells[2].indexOf('USD'));
-    expect(cells[3]).toContain('37,61 USD');
-    expect(cells[3]).toContain('17,30%');
-    expect(cells[3]).not.toContain('Bs.S');
+    expect(cells[2]).toContain('11.730,00');
+    expect(cells[3]).toContain('1.730,00');
+    expect(cells[3]).toContain('✓ Real · +17,30%');
     expect(cells[4]).toContain('Completo');
   });
 
@@ -331,7 +341,7 @@ describe('PurchasesPanel financial table', () => {
       'Acciones',
     ]);
     expect(buttons[0]?.getAttribute('aria-label')).toBe(
-      'Registrar acreditación para Banco Test, 2 ene. 2024',
+      'Registrar acreditación para Banco Test, 02/01/2024',
     );
   });
 
@@ -436,7 +446,7 @@ describe('PurchasesPanel financial table', () => {
     expect(getPurchaseRows()).toBe(10);
     expect(container.textContent).toContain('Página 1 de 2');
 
-    clickButton('Siguiente');
+    clickButtonByLabel('Página siguiente');
 
     expect(getPurchaseRows()).toBe(2);
     expect(container.textContent).toContain('Página 2 de 2');
@@ -455,10 +465,49 @@ describe('PurchasesPanel financial table', () => {
     expect(getSaleRows()).toBe(10);
     expect(container.textContent).toContain('Página 1 de 2');
 
-    clickButton('Siguiente');
+    clickButtonByLabel('Página siguiente');
 
     expect(getSaleRows()).toBe(1);
     expect(container.textContent).toContain('Página 2 de 2');
+  });
+
+  it('navigates to the extremes, adjacent pages and an exact page', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: Array.from({ length: 45 }, (_, index) =>
+          createPurchase({ id: `purchase-${index}` }),
+        ),
+      });
+    });
+
+    expect(container.textContent).toContain('Página 1 de 5');
+
+    clickButtonByLabel('Última página');
+    expect(container.textContent).toContain('Página 5 de 5');
+
+    clickButtonByLabel('Página anterior');
+    expect(container.textContent).toContain('Página 4 de 5');
+
+    clickButtonByLabel('Primera página');
+    expect(container.textContent).toContain('Página 1 de 5');
+
+    clickButtonByLabel('Página 3');
+    expect(container.textContent).toContain('Página 3 de 5');
+
+    const jumpInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label^="Ir a página exacta"]',
+    );
+    expect(jumpInput).not.toBeNull();
+    if (!jumpInput) return;
+    setInputValue(jumpInput, '5');
+
+    const jumpForm = jumpInput.closest('form');
+    expect(jumpForm).not.toBeNull();
+    act(() => {
+      jumpForm?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(container.textContent).toContain('Página 5 de 5');
   });
 });
 
@@ -562,5 +611,150 @@ describe('PurchasesPanel sales registration and data import', () => {
     ]);
     expect(useAppStore.getState().purchases[1].status).toBe('partial');
     expect(container.textContent).toContain('Se importaron 1 compras y 1 ventas.');
+  });
+});
+
+describe('PurchasesPanel floating and realized PnL', () => {
+  const resultCell = (): Element | null =>
+    container.querySelector('tbody tr td:nth-child(3)');
+  const profitCell = (): Element | null =>
+    container.querySelector('tbody tr td:nth-child(4)');
+
+  it('projects the result and profit at the current Binance rate for intact purchases', () => {
+    act(() => {
+      useAppStore.setState({
+        rates: {
+          bcv: { value: 40, updatedAt: null, source: 'manual' },
+          binance: { value: 50, updatedAt: null, source: 'manual' },
+        },
+      });
+    });
+
+    expect(resultCell()?.textContent).toContain('~ 12.750,00');
+    expect(resultCell()?.textContent).toContain('~ 255,00 USD netos');
+    expect(profitCell()?.textContent).toContain('~ 2.750,00');
+    expect(profitCell()?.textContent).toContain('Est. · 27,50%');
+    expect(resultCell()?.querySelector('[title*="Resultado estimado"]')).not.toBeNull();
+    expect(profitCell()?.querySelector('[title*="Ganancia estimada"]')).not.toBeNull();
+  });
+
+  it('shows the realized PnL of the sold fraction for partially sold purchases', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: [
+          createPurchase({
+            status: 'partial',
+            soldUsdt: 100,
+            initialBinanceUsdt: 250,
+            remainingBinanceUsdt: 150,
+            realizedRevenueVes: 27_600,
+            realizedProfitVes: 3_000,
+            allocatedCostVesTotal: 24_600,
+          }),
+        ],
+      });
+    });
+
+    expect(resultCell()?.textContent).toContain('27.600,00');
+    expect(resultCell()?.textContent).toContain('Parcial (40%) · +12,20%');
+    expect(profitCell()?.textContent).toContain('3.000,00');
+    expect(profitCell()?.textContent).toContain('Parcial (40%) · +12,20%');
+  });
+
+  it('shows the final realized PnL with a check mark for sold-out purchases', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: [
+          createPurchase({
+            status: 'completed',
+            soldUsdt: 250,
+            initialBinanceUsdt: 250,
+            remainingBinanceUsdt: 0,
+            realizedRevenueVes: 46_000,
+            realizedProfitVes: 6_000,
+            allocatedCostVesTotal: 40_000,
+          }),
+        ],
+      });
+    });
+
+    expect(resultCell()?.textContent).toContain('46.000,00');
+    expect(profitCell()?.textContent).toContain('6.000,00');
+    expect(profitCell()?.textContent).toContain('✓ Real · +15,00%');
+    expect(resultCell()?.querySelector('[title*="Resultado real"]')).not.toBeNull();
+    expect(profitCell()?.querySelector('[title*="Ganancia realizada"]')).not.toBeNull();
+  });
+
+  it('keeps the PnL cells empty for cancelled purchases', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: [createPurchase({ status: 'cancelled' })],
+      });
+    });
+
+    expect(resultCell()?.textContent).toBe('');
+    expect(resultCell()?.getAttribute('aria-label')).toBe('Resultado no disponible');
+    expect(profitCell()?.getAttribute('aria-label')).toBe('Ganancia no disponible');
+  });
+});
+
+describe('PurchasesPanel column resizing', () => {
+  const resizeHandle = (label: string): Element | null =>
+    container.querySelector(
+      `[role="separator"][aria-label="Ajustar ancho de la columna ${label}"]`,
+    );
+
+  it('uses strict column widths and only renders handles for resizable columns', () => {
+    expect(resizeHandle('Banco')).not.toBeNull();
+    expect(resizeHandle('Inversión')).not.toBeNull();
+    expect(resizeHandle('Resultado')).not.toBeNull();
+    expect(resizeHandle('Ganancia')).not.toBeNull();
+    expect(resizeHandle('Estado')).not.toBeNull();
+    expect(resizeHandle('Acciones')).toBeNull();
+
+    const table = container.querySelector<HTMLTableElement>(
+      'table[aria-label="Compras registradas"]',
+    );
+    expect(table?.style.width).toBe('924px');
+  });
+
+  it('resizes a column with the keyboard and persists the width', () => {
+    const handle = resizeHandle('Inversión');
+    expect(handle).not.toBeNull();
+    if (!handle) return;
+    expect(handle.getAttribute('aria-valuenow')).toBe('155');
+
+    act(() => {
+      handle.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      );
+    });
+
+    expect(useAppStore.getState().tableColumnWidths.investment).toBe(163);
+    expect(handle.getAttribute('aria-valuenow')).toBe('163');
+    const columns = container.querySelectorAll('colgroup col');
+    expect((columns[1] as HTMLElement).style.width).toBe('163px');
+  });
+
+  it('clamps the width to the allowed range and resets it on double click', () => {
+    const handle = resizeHandle('Inversión');
+    expect(handle).not.toBeNull();
+    if (!handle) return;
+
+    for (let step = 0; step < 10; step += 1) {
+      act(() => {
+        handle.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
+        );
+      });
+    }
+
+    expect(useAppStore.getState().tableColumnWidths.investment).toBe(140);
+
+    act(() => {
+      handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+
+    expect(useAppStore.getState().tableColumnWidths.investment).toBe(155);
   });
 });

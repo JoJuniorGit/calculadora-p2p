@@ -22,6 +22,7 @@ const persistedState = {
   sales: [],
   disclaimer: { text: 'Aviso de prueba', hasSeen: true },
   theme: 'dark' as const,
+  tableColumnWidths: { investment: 180 },
 };
 
 beforeEach(async () => {
@@ -43,6 +44,7 @@ describe('app store hydration', () => {
     expect(useAppStore.getState().theme).toBe('dark');
     expect(useAppStore.getState().rates.bcv.value).toBe(52);
     expect(useAppStore.getState().disclaimer.text).toBe('Aviso de prueba');
+    expect(useAppStore.getState().tableColumnWidths).toEqual({ investment: 180 });
   });
 
   it('falls back to legacy localStorage when IndexedDB is empty', async () => {

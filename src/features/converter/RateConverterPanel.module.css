@@ -1,0 +1,387 @@
+.panel {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.panelHeader {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.headerSpacer {
+  width: 42px;
+  height: 42px;
+}
+
+.panelHeading {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.titleRow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.titleTooltip {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 0.4rem);
+  transform: translateY(-50%);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.panel .swapButton {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.card {
+  min-width: 0;
+}
+
+/* Active card: illuminated edge + soft top glow, like a focused fintech card. */
+.grid .cardBase {
+  border-color: var(--primary);
+  background: var(--bg-elevated);
+  box-shadow:
+    0 0 25px -8px var(--primary-glow),
+    inset 0 1px 0 var(--primary-glow);
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.copyButton {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.copyButton:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.copyButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.copyButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.copyIcon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Three fixed rows keep the amount inputs aligned across the three cards:
+   header (Card), reference-rate bar (2.25rem) and input shell. */
+.cardBody {
+  display: grid;
+  grid-template-rows: 2.25rem minmax(0, 1fr);
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.rateBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 2.25rem;
+}
+
+.rateSelect {
+  min-height: 2.25rem;
+  max-width: 52%;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.rateValue {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pivotPill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.25rem 0.6rem;
+  overflow: hidden;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inputShell {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding-right: 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.inputShell:focus-within {
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+.grid .cardBase .inputShell {
+  border-color: var(--primary);
+  background: var(--bg-elevated);
+}
+
+.amountInput {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.25rem 0.6rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: clamp(1.6rem, 2.2vw, 2rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  text-align: right;
+  outline: none;
+}
+
+.amountInput::placeholder {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
+.currencyBadge {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.quickRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.quickLabel {
+  margin-right: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.panel .quickButton {
+  min-height: 34px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel .quickButtonActive {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.panel .clearButton {
+  min-height: 34px;
+  margin-left: auto;
+  padding: 0.25rem 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.equivalence {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.equivalenceHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.equivalenceTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.referenceTag {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.equivalenceText {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.metricCard {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.06));
+}
+
+.metricCard h3 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.metricCard p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.deltaValue {
+  color: var(--text);
+  font-size: 1.12rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.metricNote {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1040px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metricGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .amountInput {
+    font-size: 1.5rem;
+  }
+
+  .panel .quickButton {
+    flex: 1 1 58px;
+  }
+
+  .panel .clearButton {
+    width: 100%;
+    margin-left: 0;
+  }
+}

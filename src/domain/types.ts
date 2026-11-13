@@ -33,6 +33,22 @@ export interface Rates {
   binance: RateQuote;
 }
 
+/** Field the user last edited in the multi-rate converter. */
+export type MultiRateSource = 'VES' | 'SLOT_1' | 'SLOT_2';
+
+export interface MultiRateConversionResult {
+  /** Bs.S equivalent for the entered amount. */
+  vesAmount: number;
+  /** USD equivalent at the Slot 1 rate. */
+  slot1Usd: number;
+  /** USD equivalent at the Slot 2 rate. */
+  slot2Usd: number;
+  /** Absolute difference between both USD equivalents. */
+  usdDifference: number;
+  /** Percentage spread between both slot rates. */
+  spreadPercentBetweenSlots: number;
+}
+
 export interface BankProfile {
   id: string;
   name: string;
@@ -354,6 +370,18 @@ export interface DisclaimerConfig {
   hasSeen: boolean;
 }
 
+/** Records-table columns with an explicit width; actions stays fixed. */
+export type TableColumnKey =
+  | 'bank'
+  | 'investment'
+  | 'outcome'
+  | 'profit'
+  | 'status'
+  | 'actions';
+
+/** Widths in CSS pixels; missing entries fall back to the column defaults. */
+export type TableColumnWidths = Partial<Record<TableColumnKey, number>>;
+
 /** Slice persisted by zustand/persist. */
 export interface PersistedState {
   schemaVersion: number;
@@ -363,6 +391,7 @@ export interface PersistedState {
   sales: SaleRecord[];
   disclaimer: DisclaimerConfig;
   theme: ThemeMode;
+  tableColumnWidths: TableColumnWidths;
 }
 
 export interface PurchaseKpis {

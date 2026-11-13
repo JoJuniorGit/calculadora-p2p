@@ -10,17 +10,19 @@ import {
 import { BankProfilesPanel } from './features/bankProfiles/BankProfilesPanel';
 import { CalculatorPanel } from './features/calculator/CalculatorPanel';
 import { PurchasesPanel } from './features/purchases/PurchasesPanel';
+import { RateConverterPanel } from './features/converter/RateConverterPanel';
 import { RatesPanel } from './features/rates/RatesPanel';
 import { useInitialRates } from './features/rates/useInitialRates';
 import { SettingsPanel } from './features/settings/SettingsPanel';
 import { formatPct } from './utils/format';
 import styles from './App.module.css';
 
-type AppTab = 'rates' | 'profiles' | 'calculator' | 'records';
+type AppTab = 'rates' | 'profiles' | 'calculator' | 'records' | 'converter';
 
 export const ACTIVE_TAB_STORAGE_KEY = 'calculadora-p2p:active-tab';
 
 const tabs: Array<{ id: AppTab; label: string }> = [
+  { id: 'converter', label: 'Convertir' },
   { id: 'calculator', label: 'Calculadora' },
   { id: 'profiles', label: 'Perfiles' },
   { id: 'rates', label: 'Tasas' },
@@ -33,11 +35,11 @@ function isAppTab(value: string): value is AppTab {
 
 function readStoredTab(): AppTab {
   try {
-    if (typeof window === 'undefined') return 'calculator';
+    if (typeof window === 'undefined') return 'converter';
     const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-    return stored !== null && isAppTab(stored) ? stored : 'calculator';
+    return stored !== null && isAppTab(stored) ? stored : 'converter';
   } catch {
-    return 'calculator';
+    return 'converter';
   }
 }
 
@@ -239,6 +241,7 @@ export default function App() {
           {activeTab === 'profiles' && <BankProfilesPanel />}
           {activeTab === 'calculator' && <CalculatorPanel />}
           {activeTab === 'records' && <PurchasesPanel />}
+          {activeTab === 'converter' && <RateConverterPanel />}
         </div>
       </div>
       <PwaNotices />

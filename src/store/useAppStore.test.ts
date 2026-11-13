@@ -108,6 +108,7 @@ function resetStore(): void {
     filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
     disclaimer: defaultDisclaimer,
     theme: 'light',
+    tableColumnWidths: {},
   });
   localStorage.clear();
 }
@@ -547,6 +548,7 @@ describe('useAppStore imports', () => {
       sales: [],
       disclaimer: { text: 'Aviso importado para pruebas.', hasSeen: true },
       theme: 'dark',
+      tableColumnWidths: { investment: 200 },
     };
 
     useAppStore.setState({ filters: { status: 'completed', profileName: 'Antiguo', dateFrom: 'x', dateTo: 'y' } });
@@ -560,8 +562,23 @@ describe('useAppStore imports', () => {
       sales: config.sales,
       disclaimer: config.disclaimer,
       theme: 'dark',
+      tableColumnWidths: config.tableColumnWidths,
       filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
     });
+  });
+
+  it('clamps table column widths and falls back to the default for invalid values', () => {
+    useAppStore.getState().setTableColumnWidth('status', 10);
+    expect(useAppStore.getState().tableColumnWidths.status).toBe(130);
+
+    useAppStore.getState().setTableColumnWidth('status', 200);
+    expect(useAppStore.getState().tableColumnWidths.status).toBe(200);
+
+    useAppStore.getState().setTableColumnWidth('status', 900);
+    expect(useAppStore.getState().tableColumnWidths.status).toBe(320);
+
+    useAppStore.getState().setTableColumnWidth('status', Number.NaN);
+    expect(useAppStore.getState().tableColumnWidths.status).toBe(145);
   });
 });
 

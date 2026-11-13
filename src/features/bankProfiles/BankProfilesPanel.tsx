@@ -378,6 +378,7 @@ export function BankProfilesPanel() {
   return (
     <section className={styles.panel} aria-labelledby="bank-profiles-title">
       <header className={styles.pageHeader}>
+        <span className={styles.headerSpacer} aria-hidden="true" />
         <div className={styles.titleRow}>
           <h2 id="bank-profiles-title">Perfiles bancarios</h2>
           <InfoTooltip
@@ -386,7 +387,11 @@ export function BankProfilesPanel() {
             align="center"
           />
         </div>
-        {profiles.length > 0 && <Button onClick={openCreateForm}>Crear perfil</Button>}
+        {profiles.length > 0 ? (
+          <Button onClick={openCreateForm}>Crear perfil</Button>
+        ) : (
+          <span className={styles.headerSpacer} aria-hidden="true" />
+        )}
       </header>
 
       {profiles.length === 0 ? (

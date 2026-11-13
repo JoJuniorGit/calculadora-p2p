@@ -3,6 +3,7 @@ import type { BankProfile, CalculationInput, CalculationOptions } from './types'
 import {
   ABNORMAL_GAP_PCT,
   calculate,
+  calculateMultiRateConversion,
   getExchangeGap,
   INTERVENTION_PCT,
   round2,
@@ -602,6 +603,57 @@ describe('calculation waterfall', () => {
       amountBs: -80,
       amountUsd: null,
       detail: 'Cobrada extra en Bs.S',
+    });
+  });
+});
+
+describe('calculateMultiRateConversion', () => {
+  it('converts Bs.S into BCV and Binance USD equivalents', () => {
+    const result = calculateMultiRateConversion('VES', 11_730, 40, 46);
+
+    expect(result.vesAmount).toBe(11_730);
+    expect(result.slot1Usd).toBe(293.25);
+    expect(result.slot2Usd).toBe(255);
+    expect(result.usdDifference).toBe(38.25);
+    expect(result.spreadPercentBetweenSlots).toBe(15);
+  });
+
+  it('derives the exact Bs.S from Slot 1 USD and the USDT needed in Slot 2', () => {
+    const result = calculateMultiRateConversion('SLOT_1', 250, 40, 46);
+
+    expect(result.slot1Usd).toBe(250);
+    expect(result.vesAmount).toBe(10_000);
+    expect(result.slot2Usd).toBe(217.39);
+    expect(result.usdDifference).toBe(32.61);
+  });
+
+  it('converts USDT from Slot 2 into Bs.S and its Slot 1 USD equivalent', () => {
+    const result = calculateMultiRateConversion('SLOT_2', 100, 40, 46);
+
+    expect(result.slot2Usd).toBe(100);
+    expect(result.vesAmount).toBe(4_600);
+    expect(result.slot1Usd).toBe(115);
+    expect(result.usdDifference).toBe(15);
+  });
+
+  it('handles a zero amount without divisions by zero or NaN', () => {
+    const result = calculateMultiRateConversion('VES', 0, 40, 46);
+
+    expect(result.vesAmount).toBe(0);
+    expect(result.slot1Usd).toBe(0);
+    expect(result.slot2Usd).toBe(0);
+    expect(result.usdDifference).toBe(0);
+    expect(result.spreadPercentBetweenSlots).toBe(15);
+    expect(Object.values(result).some((value) => Number.isNaN(value))).toBe(false);
+  });
+
+  it('returns a zeroed result when a rate is missing instead of NaN', () => {
+    expect(calculateMultiRateConversion('SLOT_1', 100, 0, 46)).toEqual({
+      vesAmount: 0,
+      slot1Usd: 0,
+      slot2Usd: 0,
+      usdDifference: 0,
+      spreadPercentBetweenSlots: 0,
     });
   });
 });

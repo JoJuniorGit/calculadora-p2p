@@ -105,6 +105,7 @@ const persistedState: PersistedState = {
   sales: [],
   disclaimer: { text: '', hasSeen: false },
   theme: 'light',
+  tableColumnWidths: {},
 };
 
 describe('bank profile schemas', () => {

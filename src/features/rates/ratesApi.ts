@@ -52,7 +52,23 @@ interface RecordValue {
   [key: string]: unknown;
 }
 
-class RateApiError extends Error {}
+export type RateApiErrorKind =
+  | 'timeout'
+  | 'network'
+  | 'http'
+  | 'format'
+  | 'data'
+  | 'unknown';
+
+export class RateApiError extends Error {
+  constructor(
+    message: string,
+    readonly kind: RateApiErrorKind = 'unknown',
+  ) {
+    super(message);
+    this.name = 'RateApiError';
+  }
+}
 
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -80,6 +96,7 @@ async function withTimeout<T>(
     if (controller.signal.aborted) {
       throw new RateApiError(
         `La consulta a ${service} superó el límite de ${Math.round(timeoutMs / 1000)} segundos.`,
+        'timeout',
       );
     }
     if (error instanceof RateApiError || error instanceof HistoricalRateLookupError) {
@@ -87,6 +104,7 @@ async function withTimeout<T>(
     }
     throw new RateApiError(
       `No se pudo consultar ${service}. Verifica la conexión, los permisos CORS o la disponibilidad del servicio.`,
+      'network',
     );
   } finally {
     clearTimeout(timeout);
@@ -103,12 +121,12 @@ async function fetchDolarApiRate(source: 'oficial' | 'paralelo'): Promise<Fetche
     });
 
     if (!response.ok) {
-      throw new RateApiError(`${service} respondió con el estado ${response.status}.`);
+      throw new RateApiError(`${service} respondió con el estado ${response.status}.`, 'http');
     }
 
     const payload: unknown = await response.json();
     if (!Array.isArray(payload)) {
-      throw new RateApiError(`${service} devolvió una respuesta con formato inválido.`);
+      throw new RateApiError(`${service} devolvió una respuesta con formato inválido.`, 'format');
     }
 
     const entry = payload.find(
@@ -119,12 +137,15 @@ async function fetchDolarApiRate(source: 'oficial' | 'paralelo'): Promise<Fetche
     );
 
     if (!entry) {
-      throw new RateApiError(`No se encontró la tasa ${source} en la respuesta de DolarApi.`);
+      throw new RateApiError(
+        `No se encontró la tasa ${source} en la respuesta de DolarApi.`,
+        'data',
+      );
     }
 
     const value = parsePositiveNumber(entry.promedio);
     if (value === null) {
-      throw new RateApiError(`La tasa ${source} recibida de DolarApi no es válida.`);
+      throw new RateApiError(`La tasa ${source} recibida de DolarApi no es válida.`, 'data');
     }
 
     return { value, provider: service };
@@ -156,12 +177,12 @@ async function fetchBinanceProxyRate(): Promise<FetchedRate> {
     });
 
     if (!response.ok) {
-      throw new RateApiError(`${service} respondió con el estado ${response.status}.`);
+      throw new RateApiError(`${service} respondió con el estado ${response.status}.`, 'http');
     }
 
     const payload: unknown = await response.json();
     if (!isRecord(payload) || !Array.isArray(payload.data)) {
-      throw new RateApiError(`${service} devolvió una respuesta con formato inválido.`);
+      throw new RateApiError(`${service} devolvió una respuesta con formato inválido.`, 'format');
     }
 
     const prices = payload.data.flatMap((item) => {
@@ -171,7 +192,7 @@ async function fetchBinanceProxyRate(): Promise<FetchedRate> {
     });
 
     if (prices.length === 0) {
-      throw new RateApiError(`${service} no devolvió precios válidos.`);
+      throw new RateApiError(`${service} no devolvió precios válidos.`, 'data');
     }
 
     prices.sort((left, right) => left - right);
@@ -182,7 +203,7 @@ async function fetchBinanceProxyRate(): Promise<FetchedRate> {
         : prices[middle];
 
     if (!Number.isFinite(value) || value <= 0) {
-      throw new RateApiError(`${service} no devolvió una tasa válida.`);
+      throw new RateApiError(`${service} no devolvió una tasa válida.`, 'data');
     }
 
     return { value, provider: service };

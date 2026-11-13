@@ -198,6 +198,7 @@ function createPersistedState(): PersistedState {
     sales: [],
     disclaimer: { text: 'Aviso de simulación para pruebas.', hasSeen: true },
     theme: 'light',
+    tableColumnWidths: { investment: 200 },
   };
 }
 

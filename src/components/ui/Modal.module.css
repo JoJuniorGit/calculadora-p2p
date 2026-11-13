@@ -34,11 +34,17 @@
 }
 
 .title {
+  flex: 1;
   min-width: 0;
   margin: 0;
   font-size: 1.08rem;
   letter-spacing: -0.015em;
+  text-align: center;
   overflow-wrap: anywhere;
+}
+
+.titleSpacer {
+  flex: 0 0 44px;
 }
 
 .closeButton {

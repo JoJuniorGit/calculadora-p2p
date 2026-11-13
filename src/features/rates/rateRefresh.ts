@@ -3,6 +3,10 @@ import { fetchBcvRate, fetchBinanceRate, type FetchedRate } from './ratesApi';
 
 const inFlight = new Map<RateKey, Promise<FetchedRate>>();
 
+function requestRate(key: RateKey): Promise<FetchedRate> {
+  return key === 'bcv' ? fetchBcvRate() : fetchBinanceRate();
+}
+
 /**
  * Deduplicates concurrent rate requests for the same key. Sequential manual
  * refreshes still fetch fresh data because the entry is removed on settle.
@@ -11,7 +15,7 @@ export function fetchRateOnce(key: RateKey): Promise<FetchedRate> {
   const existing = inFlight.get(key);
   if (existing) return existing;
 
-  const request = key === 'bcv' ? fetchBcvRate() : fetchBinanceRate();
+  const request = requestRate(key);
   inFlight.set(key, request);
   request.then(
     () => {

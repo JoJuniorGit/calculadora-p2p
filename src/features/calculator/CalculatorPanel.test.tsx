@@ -302,8 +302,14 @@ describe('CalculatorPanel bank profile priority', () => {
 
     clickButton('Registrar compra');
 
-    expect(container.textContent).toContain('Confirmar registro de compra');
-    expect(container.textContent).toContain('Monto ingresado');
+    expect(container.textContent).toContain('Confirmar Registro de Compra');
+    expect(container.textContent).toContain('Perfil bancario');
+    expect(container.textContent).toContain('Fecha');
+    expect(container.textContent).toContain('Inversión');
+    expect(container.textContent).toContain('USD comprados');
+    expect(container.textContent).toContain('Retorno Esperado');
+    expect(container.textContent).toContain('Ganancia');
+    expect(container.textContent).not.toContain('Monto ingresado');
     expect(useAppStore.getState().purchases).toHaveLength(0);
 
     clickButton('Confirmar compra');
@@ -357,7 +363,6 @@ describe('CalculatorPanel bank profile priority', () => {
     clickButton('Registrar compra');
 
     expect(container.textContent).toContain(formatDateOnly(purchaseDate));
-    expect(container.textContent).toContain('Fuente de tasas');
     expect(container.textContent).toContain('Histórica');
     clickButton('Confirmar compra');
 
@@ -426,7 +431,7 @@ describe('CalculatorPanel bank profile priority', () => {
     expect(rateSummary?.textContent).toContain('70,00 Bs.S/USD');
 
     clickButton('Registrar compra');
-    expect(container.textContent).toContain('Manual');
+    expect(container.textContent).toContain('Ganancia');
     clickButton('Confirmar compra');
 
     expect(useAppStore.getState().purchases[0]).toMatchObject({
@@ -573,6 +578,45 @@ describe('CalculatorPanel bank profile priority', () => {
         binanceMethod: 'median',
       },
     });
+  });
+
+  it('warns about stale P2P rates with the failure reason when the refresh fails', async () => {
+    const staleTimestamp = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    act(() => {
+      useAppStore.setState({
+        rates: {
+          bcv: { value: 40, updatedAt: staleTimestamp, source: 'auto' },
+          binance: { value: 46, updatedAt: staleTimestamp, source: 'auto' },
+        },
+      });
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    );
+
+    const amountInput = container.querySelector<HTMLInputElement>(
+      'input[name="calculator-amount"]',
+    );
+    expect(amountInput).not.toBeNull();
+    setInputValue(amountInput as HTMLInputElement, '100');
+
+    await act(async () => {
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, AUTO_RATE_REFRESH_DEBOUNCE_MS + 100),
+      );
+    });
+
+    expect(container.textContent).toContain('Tasas P2P desactualizadas');
+    expect(container.textContent).toContain('sin actualizarse');
+    expect(container.textContent).toContain(
+      'no hay conexión a internet o la API no está disponible (CORS)',
+    );
+    expect(container.textContent).not.toContain(
+      'No se pudieron actualizar las tasas automáticamente',
+    );
+    expect(useAppStore.getState().rates.binance.value).toBe(46);
   });
 });
 

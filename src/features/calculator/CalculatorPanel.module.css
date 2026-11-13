@@ -306,8 +306,31 @@
 }
 
 .panel > .successFeedback,
-.panel > .errorFeedback {
+.panel > .errorFeedback,
+.panel > .staleRateNotice {
   grid-column: 1 / -1;
+}
+
+/* Stale-rate banner: same treatment as the responsibility notice. */
+.staleRateNotice {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+  overflow-wrap: anywhere;
+}
+
+.staleRateNotice p {
+  margin: 0;
+}
+
+.staleRateNoticeTitle {
+  font-weight: 700;
 }
 
 .calculatorColumn,

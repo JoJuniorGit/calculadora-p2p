@@ -9,6 +9,7 @@ import {
   round2,
 } from '../domain/calculations';
 import { canTransition } from '../domain/purchases';
+import { clampTableColumnWidth } from '../domain/tableColumns';
 import type {
   AccreditationType,
   BankProfile,
@@ -26,6 +27,8 @@ import type {
   SaleInput,
   SaleRecord,
   StatusChange,
+  TableColumnKey,
+  TableColumnWidths,
   ThemeMode,
 } from '../domain/types';
 import {
@@ -67,11 +70,13 @@ export interface AppState {
   filters: PurchaseFilters;
   disclaimer: DisclaimerConfig;
   theme: ThemeMode;
+  tableColumnWidths: TableColumnWidths;
 
   setRate(key: RateKey, value: number, source: RateSource): void;
   setTheme(theme: ThemeMode): void;
   toggleTheme(): void;
   setDisclaimer(patch: Partial<DisclaimerConfig>): void;
+  setTableColumnWidth(column: TableColumnKey, width: number): void;
 
   addProfile(draft: BankProfileDraft): BankProfile;
   updateProfile(id: string, draft: BankProfileDraft): void;
@@ -114,6 +119,7 @@ function createPersistedDefaults(): PersistedState {
     sales: [],
     disclaimer: { text: DEFAULT_DISCLAIMER_TEXT, hasSeen: false },
     theme: 'light',
+    tableColumnWidths: {},
   };
 }
 
@@ -246,6 +252,14 @@ export const useAppStore = create<AppState>()(
 
       setDisclaimer: (patch) =>
         set((state) => ({ disclaimer: { ...state.disclaimer, ...patch } })),
+
+      setTableColumnWidth: (column, width) =>
+        set((state) => ({
+          tableColumnWidths: {
+            ...state.tableColumnWidths,
+            [column]: clampTableColumnWidth(column, width),
+          },
+        })),
 
       addProfile: (draft) => {
         const timestamp = new Date().toISOString();
@@ -592,6 +606,7 @@ export const useAppStore = create<AppState>()(
           sales: parsed.data.sales,
           disclaimer: parsed.data.disclaimer,
           theme: parsed.data.theme,
+          tableColumnWidths: parsed.data.tableColumnWidths,
           filters: { ...DEFAULT_FILTERS },
         });
       },
@@ -609,6 +624,7 @@ export const useAppStore = create<AppState>()(
         sales: state.sales,
         disclaimer: state.disclaimer,
         theme: state.theme,
+        tableColumnWidths: state.tableColumnWidths,
       }),
       migrate: migratePersistedState,
       merge: (persistedState, currentState) => {

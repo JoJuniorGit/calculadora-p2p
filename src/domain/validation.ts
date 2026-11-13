@@ -385,6 +385,7 @@ export const persistedStateSchema = z.object(
     sales: z.array(saleRecordSchema, arrayParams).default([]),
     disclaimer: disclaimerSchema,
     theme: themeSchema,
+    tableColumnWidths: z.record(z.string(), finiteNumber).default({}),
   },
   objectParams,
 );

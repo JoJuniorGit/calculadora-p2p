@@ -8,6 +8,8 @@ import type {
   CommissionBase,
   InterbankBase,
   IgtfBase,
+  MultiRateConversionResult,
+  MultiRateSource,
   Profitability,
   PurchaseRecord,
   PurchaseStatus,
@@ -117,6 +119,64 @@ export function round2(value: number): number {
   if (!Number.isFinite(value)) return value;
   const sign = value < 0 ? -1 : 1;
   return sign * Number(`${Math.round(Number(`${Math.abs(value)}e2`))}e-2`);
+}
+
+const EMPTY_MULTI_RATE_CONVERSION: MultiRateConversionResult = {
+  vesAmount: 0,
+  slot1Usd: 0,
+  slot2Usd: 0,
+  usdDifference: 0,
+  spreadPercentBetweenSlots: 0,
+};
+
+/**
+ * Converts amounts between Bs.S and up to two rate slots using the bolívar as
+ * the pivot. `source` marks which field the user typed in; the other two are
+ * derived from it. Invalid rates or amounts return a zeroed result instead of
+ * throwing or producing NaN.
+ */
+export function calculateMultiRateConversion(
+  source: MultiRateSource,
+  amount: number,
+  rate1: number,
+  rate2: number,
+): MultiRateConversionResult {
+  const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
+  const safeRate1 = Number.isFinite(rate1) && rate1 > 0 ? rate1 : 0;
+  const safeRate2 = Number.isFinite(rate2) && rate2 > 0 ? rate2 : 0;
+
+  if (safeRate1 <= 0 || safeRate2 <= 0) {
+    return { ...EMPTY_MULTI_RATE_CONVERSION };
+  }
+
+  let vesAmount: number;
+  let slot1Usd: number;
+  let slot2Usd: number;
+
+  if (source === 'VES') {
+    vesAmount = round2(safeAmount);
+    slot1Usd = round2(vesAmount / safeRate1);
+    slot2Usd = round2(vesAmount / safeRate2);
+  } else if (source === 'SLOT_1') {
+    slot1Usd = round2(safeAmount);
+    vesAmount = round2(slot1Usd * safeRate1);
+    slot2Usd = round2(vesAmount / safeRate2);
+  } else {
+    slot2Usd = round2(safeAmount);
+    vesAmount = round2(slot2Usd * safeRate2);
+    slot1Usd = round2(vesAmount / safeRate1);
+  }
+
+  const minRate = Math.min(safeRate1, safeRate2);
+  const maxRate = Math.max(safeRate1, safeRate2);
+
+  return {
+    vesAmount,
+    slot1Usd,
+    slot2Usd,
+    usdDifference: round2(Math.abs(slot1Usd - slot2Usd)),
+    spreadPercentBetweenSlots: round2(((maxRate - minRate) / minRate) * 100),
+  };
 }
 
 /**

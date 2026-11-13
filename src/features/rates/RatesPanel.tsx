@@ -34,6 +34,11 @@ interface RateCardProps {
   onRefresh(): void;
 }
 
+const RATE_NAMES: Record<RateKey, string> = {
+  bcv: 'BCV',
+  binance: 'Binance P2P',
+};
+
 function RateCard({
   rateKey,
   title,
@@ -45,7 +50,7 @@ function RateCard({
   onValueChange,
   onRefresh,
 }: RateCardProps) {
-  const rateName = rateKey === 'bcv' ? 'BCV' : 'Binance P2P';
+  const rateName = RATE_NAMES[rateKey];
   const refreshLabel = `${loading ? 'Actualizando' : 'Actualizar'} tasa ${rateName}`;
 
   return (

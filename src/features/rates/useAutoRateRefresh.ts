@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { RateKey, Rates } from '../../domain/types';
 import { useAppStore } from '../../store/useAppStore';
 import { fetchRateOnce } from './rateRefresh';
+import { RateApiError, type RateApiErrorKind } from './ratesApi';
 
 export const AUTO_RATE_REFRESH_DEBOUNCE_MS = 700;
 export const AUTO_RATE_REFRESH_TTL_MS = 5 * 60 * 1000;
@@ -13,12 +14,36 @@ const RATE_LABELS: Record<RateKey, string> = {
 
 export type AutoRateRefreshStatus = 'idle' | 'loading' | 'success' | 'error';
 
+export interface AutoRateRefreshFailure {
+  key: RateKey;
+  kind: RateApiErrorKind;
+  message: string;
+}
+
 export interface AutoRateRefreshState {
   status: AutoRateRefreshStatus;
   message: string | null;
+  failures: AutoRateRefreshFailure[];
 }
 
-const IDLE_STATE: AutoRateRefreshState = { status: 'idle', message: null };
+const IDLE_STATE: AutoRateRefreshState = {
+  status: 'idle',
+  message: null,
+  failures: [],
+};
+
+const FAILURE_REASON_LABELS: Record<RateApiErrorKind, string> = {
+  timeout: 'la API tardó demasiado en responder',
+  network: 'no hay conexión a internet o la API no está disponible (CORS)',
+  http: 'la API respondió con un error',
+  format: 'la API devolvió datos con un formato inválido',
+  data: 'la API no devolvió tasas válidas',
+  unknown: 'ocurrió un error inesperado al consultar la API',
+};
+
+export function describeRateFailure(failure: AutoRateRefreshFailure): string {
+  return FAILURE_REASON_LABELS[failure.kind];
+}
 
 export function getRatesNeedingAutoRefresh(
   rates: Rates,
@@ -56,6 +81,7 @@ export function useAutoRateRefresh(triggerKey: string | null): AutoRateRefreshSt
       setState({
         status: 'loading',
         message: 'Actualizando tasas automáticamente…',
+        failures: [],
       });
 
       const requests = pendingKeys.map((key) => fetchRateOnce(key));
@@ -64,6 +90,7 @@ export function useAutoRateRefresh(triggerKey: string | null): AutoRateRefreshSt
         if (cancelled || requestRef.current !== requestId) return;
 
         const failedKeys: RateKey[] = [];
+        const failures: AutoRateRefreshFailure[] = [];
         let updatedCount = 0;
 
         results.forEach((result, index) => {
@@ -79,6 +106,12 @@ export function useAutoRateRefresh(triggerKey: string | null): AutoRateRefreshSt
             return;
           }
           failedKeys.push(key);
+          const reason: unknown = result.reason;
+          failures.push({
+            key,
+            kind: reason instanceof RateApiError ? reason.kind : 'unknown',
+            message: reason instanceof Error ? reason.message : 'Error desconocido.',
+          });
         });
 
         if (updatedCount === 0) {
@@ -86,6 +119,7 @@ export function useAutoRateRefresh(triggerKey: string | null): AutoRateRefreshSt
             status: 'error',
             message:
               'No se pudieron actualizar las tasas automáticamente. Se mantienen los valores actuales.',
+            failures,
           });
           return;
         }
@@ -98,6 +132,7 @@ export function useAutoRateRefresh(triggerKey: string | null): AutoRateRefreshSt
                   .map((key) => RATE_LABELS[key])
                   .join(' y ')}.`
               : 'Tasas actualizadas automáticamente.',
+          failures,
         });
       });
     }, AUTO_RATE_REFRESH_DEBOUNCE_MS);

@@ -5,12 +5,20 @@
 }
 
 .pageHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
   min-width: 0;
   padding-top: 0.5rem;
+}
+
+.pageHeader > button {
+  justify-self: end;
+}
+
+.headerSpacer {
+  min-width: 0;
 }
 
 .pageHeader > div {
@@ -20,6 +28,8 @@
 .titleRow {
   display: flex;
   align-items: center;
+  justify-content: center;
+  justify-self: center;
   gap: 0.45rem;
   min-width: 0;
 }
@@ -219,8 +229,12 @@
   }
 
   .pageHeader {
+    grid-template-columns: minmax(0, 1fr);
     align-items: flex-start;
-    flex-direction: column;
+  }
+
+  .pageHeader > .headerSpacer {
+    display: none;
   }
 
   .pageHeader > button {
