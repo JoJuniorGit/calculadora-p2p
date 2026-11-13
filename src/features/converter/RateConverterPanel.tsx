@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { MultiRateSource } from '../../domain/types';
 import { calculateMultiRateConversion } from '../../domain/calculations';
 import { formatAmount, formatPct, formatRate } from '../../utils/format';
+import { atmInputToValue, formatAtmDisplay, nextAtmValue } from '../../utils/atmInput';
 import { useAppStore } from '../../store/useAppStore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -71,6 +72,7 @@ export function RateConverterPanel() {
     useState<Record<MultiRateSource, string>>(RAW_INPUTS_EMPTY);
   const [copiedSource, setCopiedSource] = useState<MultiRateSource | null>(null);
   const copyTimerRef = useRef<number | null>(null);
+  const replaceOnEditRef = useRef(false);
 
   useEffect(
     () => () => {
@@ -108,7 +110,9 @@ export function RateConverterPanel() {
   ];
 
   const displayedValue = (source: MultiRateSource): string => {
-    if (source === activeSource) return rawInputs[source];
+    if (source === activeSource) {
+      return rawInputs[source].trim() === '' ? '' : formatAtmDisplay(rawInputs[source]);
+    }
     if (!result) return '';
     if (source === 'VES') return formatAmount(result.vesAmount);
     if (source === 'SLOT_1') return formatAmount(result.slot1Usd);
@@ -123,21 +127,49 @@ export function RateConverterPanel() {
     return result.slot2Usd;
   };
 
-  const handleFocus = (source: MultiRateSource): void => {
-    if (source === activeSource) return;
-    setActiveSource(source);
-    setRawInputs((current) => ({ ...current, [source]: displayedValue(source) }));
+  const handleFocus = (source: MultiRateSource, input: HTMLInputElement): void => {
+    if (source !== activeSource) {
+      setActiveSource(source);
+      const value = valueForSource(source);
+      setRawInputs((current) => ({
+        ...current,
+        [source]: value === null ? '' : value.toFixed(2),
+      }));
+    }
+
+    replaceOnEditRef.current = true;
+    input.select();
+    window.requestAnimationFrame(() => {
+      if (document.activeElement === input) input.select();
+    });
   };
 
   const handleAmountChange = (source: MultiRateSource, text: string): void => {
+    const replacing = replaceOnEditRef.current;
+    replaceOnEditRef.current = false;
     setActiveSource(source);
-    setRawInputs((current) => ({ ...current, [source]: text }));
+    setRawInputs((current) => {
+      if (!replacing) {
+        return {
+          ...current,
+          [source]: nextAtmValue(displayedValue(source), text),
+        };
+      }
+
+      const previous = displayedValue(source);
+      const typed =
+        previous !== '' && text.length > previous.length && text.startsWith(previous)
+          ? text.slice(previous.length)
+          : text;
+
+      return { ...current, [source]: atmInputToValue(typed) };
+    });
   };
 
   const handleQuickAmount = (amount: number): void => {
     const target: ConverterSlot = activeSource === 'SLOT_2' ? 'SLOT_2' : 'SLOT_1';
     setActiveSource(target);
-    setRawInputs((current) => ({ ...current, [target]: String(amount) }));
+    setRawInputs((current) => ({ ...current, [target]: amount.toFixed(2) }));
   };
 
   const handleClear = (): void => {
@@ -311,10 +343,10 @@ export function RateConverterPanel() {
                   <input
                     className={styles.amountInput}
                     type="text"
-                    inputMode="decimal"
+                    inputMode="numeric"
                     name={SOURCE_FIELD_NAMES[source]}
                     value={displayedValue(source)}
-                    onFocus={() => handleFocus(source)}
+                    onFocus={(event) => handleFocus(source, event.currentTarget)}
                     onChange={(event) => handleAmountChange(source, event.target.value)}
                     aria-label={`Monto en ${unit}`}
                     placeholder="0,00"

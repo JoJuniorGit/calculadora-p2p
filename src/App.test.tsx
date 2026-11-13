@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App, { ACTIVE_TAB_STORAGE_KEY } from './App';
+import { resetInstallPromptForTests } from './components/pwa/installSupport';
 import { clearInFlightRatesForTests } from './features/rates/rateRefresh';
 import { useAppStore } from './store/useAppStore';
 
@@ -20,6 +21,7 @@ let container: HTMLDivElement;
 beforeEach(() => {
   localStorage.clear();
   clearInFlightRatesForTests();
+  resetInstallPromptForTests();
   useAppStore.setState({
     schemaVersion: 1,
     rates: {
@@ -90,6 +92,38 @@ describe('client render smoke', () => {
     expect(container.textContent).toContain('Conversor de Tasas');
     expect(container.textContent).toContain('Equivalencia y poder de compra');
     expect(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)).toBe('converter');
+  });
+
+  it('starts the install flow from the brand mark when available', () => {
+    act(() => {
+      root?.render(<App />);
+    });
+
+    expect(container.querySelector('button[title="Instalar la app"]')).toBeNull();
+
+    const prompt = vi.fn(async () => {});
+    const event = new Event('beforeinstallprompt', { cancelable: true }) as Event & {
+      prompt: () => Promise<void>;
+      userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+    };
+    event.prompt = prompt;
+    event.userChoice = Promise.resolve({ outcome: 'accepted', platform: 'web' });
+
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    const brandInstall = container.querySelector<HTMLButtonElement>(
+      'button[title="Instalar la app"]',
+    );
+    expect(brandInstall).not.toBeNull();
+
+    act(() => {
+      brandInstall?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('button[title="Instalar la app"]')).toBeNull();
   });
 
   it('shows the responsibility notice only on the first visit', () => {

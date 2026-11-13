@@ -10,6 +10,7 @@ import {
 } from '../domain/calculations';
 import { canTransition } from '../domain/purchases';
 import { clampTableColumnWidth } from '../domain/tableColumns';
+import { DEFAULT_BANK_PROFILES } from '../domain/defaultBankProfiles';
 import type {
   AccreditationType,
   BankProfile,
@@ -114,7 +115,7 @@ function createPersistedDefaults(): PersistedState {
       bcv: { value: 0, updatedAt: null, source: 'manual' },
       binance: { value: 0, updatedAt: null, source: 'manual' },
     },
-    profiles: [],
+    profiles: DEFAULT_BANK_PROFILES.map((profile) => ({ ...profile })),
     purchases: [],
     sales: [],
     disclaimer: { text: DEFAULT_DISCLAIMER_TEXT, hasSeen: false },

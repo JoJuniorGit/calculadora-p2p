@@ -14,8 +14,17 @@ function jsonResponse(payload: unknown): Response {
   } as Response;
 }
 
+function failedResponse(status = 500): Response {
+  return {
+    ok: false,
+    status,
+    json: async () => null,
+  } as Response;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
@@ -47,6 +56,105 @@ describe('fetchBinanceRate', () => {
     expect(rate.value).toBe(100);
     expect(rate.provider).toContain('Binance');
     expect(rate.provider.toLowerCase()).not.toContain('proxy');
+  });
+
+  it('falls back to CriptoYa when the dev proxy fails', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.startsWith('/binance-api/')) {
+        return Promise.resolve(failedResponse(503));
+      }
+      return Promise.resolve(jsonResponse({ ask: 1040, totalAsk: 1040, bid: 1048, totalBid: 1048 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const rate = await fetchBinanceRate();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain('criptoya.com');
+    expect(rate.value).toBe(1048);
+    expect(rate.provider).toContain('CriptoYa');
+  });
+
+  it('falls back to DolarApi paralelo when CriptoYa fails', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.startsWith('/binance-api/') || url.includes('criptoya.com')) {
+        return Promise.resolve(failedResponse(500));
+      }
+      return Promise.resolve(
+        jsonResponse([
+          { fuente: 'oficial', promedio: 911.5 },
+          { fuente: 'paralelo', promedio: 1041.4 },
+        ]),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const rate = await fetchBinanceRate();
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2][0])).toContain('ve.dolarapi.com');
+    expect(rate.value).toBe(1041.4);
+    expect(rate.provider).toContain('DolarApi');
+  });
+
+  it('falls back to Yadio when every P2P provider fails', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('yadio.io')) {
+        return Promise.resolve(jsonResponse({ USD: { VES: 1041.25 } }));
+      }
+      return Promise.resolve(failedResponse(500));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const rate = await fetchBinanceRate();
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(rate.value).toBe(1041.25);
+    expect(rate.provider).toContain('Yadio');
+  });
+
+  it('throws when every binance provider fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(failedResponse(500)));
+
+    await expect(fetchBinanceRate()).rejects.toThrow(
+      /ninguna de las APIs de respaldo/,
+    );
+  });
+
+  it('uses the same-origin proxy instead of the Binance dev proxy outside development', async () => {
+    vi.stubEnv('DEV', false);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/binance-rate') {
+        return Promise.resolve(jsonResponse({ value: 1046.9, provider: 'Binance P2P (proxy)' }));
+      }
+      return Promise.resolve(failedResponse(404));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const rate = await fetchBinanceRate();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/binance-rate');
+    expect(rate.value).toBe(1046.9);
+    expect(rate.provider).toContain('Binance');
+  });
+
+  it('falls back to CriptoYa when the production proxy fails', async () => {
+    vi.stubEnv('DEV', false);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/binance-rate') {
+        return Promise.resolve(failedResponse(502));
+      }
+      return Promise.resolve(jsonResponse({ ask: 1040, bid: 1048 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const rate = await fetchBinanceRate();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain('criptoya.com');
+    expect(rate.value).toBe(1048);
+    expect(rate.provider).toContain('CriptoYa');
   });
 
   it('parses the CORS-enabled P2P history and official BCV history', async () => {

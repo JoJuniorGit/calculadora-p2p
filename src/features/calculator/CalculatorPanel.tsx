@@ -797,12 +797,11 @@ export function CalculatorPanel() {
                         Number.isInteger(selectedProfile.binanceDepositPct) ? 0 : 2,
                       )}
                     </span>
-                    <span className={styles.quickFact} title="Costo interbancario predeterminado">
-                      Interbancario:{' '}
-                      {selectedProfile.interbankEnabled
-                        ? formatProfilePct(selectedProfile.interbankPct)
-                        : 'off'}
-                    </span>
+                    {selectedProfile.interbankEnabled && (
+                      <span className={styles.quickFact} title="Costo interbancario predeterminado">
+                        Interbancario: {formatProfilePct(selectedProfile.interbankPct)}
+                      </span>
+                    )}
                   </div>
                 </div>
               ) : (

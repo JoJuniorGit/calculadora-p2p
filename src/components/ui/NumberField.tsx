@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from 'react';
+import { formatAtmDisplay, nextAtmValue } from '../../utils/atmInput';
 import styles from './fields.module.css';
 
 export interface NumberFieldProps {
@@ -19,22 +20,6 @@ export interface NumberFieldProps {
 function parseNumericValue(value: string): number {
   const normalized = value.trim().replace(',', '.');
   return normalized === '' ? Number.NaN : Number(normalized);
-}
-
-function formatAtmDisplay(value: string, decimals: number): string {
-  const numericValue = parseNumericValue(value);
-  if (!Number.isFinite(numericValue)) return value;
-
-  return new Intl.NumberFormat('es-VE', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(numericValue);
-}
-
-function atmInputToValue(raw: string, decimals: number): string {
-  const digits = raw.replace(/\D/g, '');
-  if (digits === '') return '';
-  return (Number(digits) / 10 ** decimals).toFixed(decimals);
 }
 
 export function NumberField({
@@ -87,19 +72,13 @@ export function NumberField({
           value={displayValue}
           onChange={(event) => {
             const raw = event.currentTarget.value;
-            const digits = raw.replace(/\D/g, '');
-            const deleting = raw.length < displayValue.length;
-
-            if (digits === '') {
-              onChange('');
-              return;
-            }
-            if (deleting && /^0+$/.test(digits)) {
+            const nextValue = nextAtmValue(displayValue, raw, decimals);
+            if (nextValue === '') {
               onChange('');
               return;
             }
 
-            onChange(atmInputToValue(raw, decimals));
+            onChange(nextValue);
           }}
           onKeyDown={(event) => {
             if (stepValue === undefined || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) {

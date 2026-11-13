@@ -54,7 +54,7 @@ iniciar.bat --no-open
 
 ## Tasas y uso sin conexión
 
-La tasa oficial del BCV y la tasa paralela se consultan en DolarApi. La tasa de Binance P2P se toma del lado de venta (`SELL`), que es el precio al que se pueden vender los USD/USDT. En desarrollo se consulta a través del proxy `/binance-api`, que apunta a `https://p2p.binance.com`; si falla, se intenta DolarApi paralelo como referencia. En producción se usa DolarApi paralelo como alternativa para Binance.
+La tasa oficial del BCV y la tasa paralela se consultan en DolarApi. La tasa de Binance P2P se toma del lado de venta (`SELL`), que es el precio al que se pueden vender los USD/USDT. En desarrollo se consulta a través del proxy `/binance-api`, que apunta a `https://p2p.binance.com`; en producción se usa la función serverless `/api/binance-rate` (misma función del proxy, sin CORS). Si esa consulta falla, se intenta CriptoYa (Binance P2P), luego DolarApi paralelo y por último Yadio.
 
 Las tasas también se pueden editar manualmente. Si una consulta falla por red, CORS o disponibilidad del proveedor, se conserva el valor actual. La aplicación puede usarse sin conexión con los datos locales; las actualizaciones automáticas de tasas requieren internet.
 

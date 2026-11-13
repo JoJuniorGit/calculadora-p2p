@@ -519,7 +519,7 @@ describe('PurchasesPanel sales registration and data import', () => {
       });
     });
 
-    clickButton('Registrar venta P2P');
+    clickButton('Registrar Venta');
 
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(container.textContent).toContain('USDT a vender');
@@ -533,7 +533,7 @@ describe('PurchasesPanel sales registration and data import', () => {
       });
     });
 
-    clickButton('Registrar venta P2P');
+    clickButton('Registrar Venta');
 
     const [usdtInput, rateInput] = [
       ...container.querySelectorAll<HTMLInputElement>('input[role="spinbutton"]'),
@@ -756,5 +756,75 @@ describe('PurchasesPanel column resizing', () => {
     });
 
     expect(useAppStore.getState().tableColumnWidths.investment).toBe(155);
+  });
+});
+
+describe('PurchasesPanel expandable detail', () => {
+  it('expands and collapses the inline movement detail', () => {
+    const toggle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Ver detalle de Banco Test"]',
+    );
+    expect(toggle).not.toBeNull();
+    if (!toggle) return;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    act(() => {
+      toggle.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Resumen');
+    expect(container.textContent).toContain('Rendimiento');
+    expect(container.textContent).toContain('Historial de estados');
+    expect(container.textContent).not.toContain('Abrir detalle completo');
+
+    const expandedToggle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Ocultar detalle de Banco Test"]',
+    );
+    expect(expandedToggle?.getAttribute('aria-expanded')).toBe('true');
+
+    act(() => {
+      expandedToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).not.toContain('Abrir detalle completo');
+  });
+});
+
+describe('PurchasesPanel mobile cards', () => {
+  it('opens the purchase detail by tapping the card body', () => {
+    const mobileList = container.querySelector('div[aria-label="Registros de compras"]');
+    const card = mobileList?.querySelector('article');
+    expect(card).not.toBeNull();
+    if (!card) return;
+
+    act(() => {
+      card.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Detalle de compra');
+  });
+
+  it('does not open the detail when using the mobile actions menu trigger', () => {
+    const mobileTrigger = container.querySelector<HTMLButtonElement>(
+      'div[aria-label="Registros de compras"] button[aria-label^="Acciones para"]',
+    );
+    expect(mobileTrigger).not.toBeNull();
+    if (!mobileTrigger) return;
+
+    act(() => {
+      mobileTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).not.toContain('Detalle de compra');
+  });
+
+  it('shows the compact 2x2 data grid without the old detail button', () => {
+    const mobileList = container.querySelector('div[aria-label="Registros de compras"]');
+    const labels = [...(mobileList?.querySelectorAll('dt') ?? [])].map(
+      (cell) => cell.textContent,
+    );
+
+    expect(labels).toEqual(['Inversión (Bs.S)', 'En Binance', 'Resultado (Bs.S)', 'Ganancia (Bs.S)']);
+    expect(mobileList?.querySelector('button')?.textContent).not.toContain('Ver detalle');
   });
 });

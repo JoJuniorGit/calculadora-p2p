@@ -615,15 +615,49 @@
   place-items: center;
   width: 42px;
   height: 42px;
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 13px;
-  background: linear-gradient(145deg, var(--primary), color-mix(in srgb, var(--primary) 58%, #7c3aed));
+  background:
+    radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.38), transparent 48%),
+    linear-gradient(145deg, #3b76f6 0%, #245eea 52%, #6d3ae0 100%);
   color: #fff;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  box-shadow: 0 8px 20px -14px var(--primary);
+  box-shadow:
+    0 10px 22px -14px rgba(36, 94, 234, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.brandMark svg {
+  width: 22px;
+  height: 22px;
+}
+
+.brandInstall {
+  display: grid;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.brandInstall:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.brandInstall .brandMark {
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.brandInstall:hover .brandMark {
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 26px -14px rgba(36, 94, 234, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 @media (max-width: 420px) {
@@ -631,6 +665,14 @@
     width: 38px;
     height: 38px;
     border-radius: 12px;
-    font-size: 0.62rem;
+  }
+
+  .brandMark svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .brandInstall {
+    border-radius: 12px;
   }
 }

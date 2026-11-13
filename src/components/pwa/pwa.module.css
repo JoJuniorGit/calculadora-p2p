@@ -45,6 +45,18 @@
   gap: 0.4rem;
 }
 
+.installButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.installIcon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
 @media (max-width: 520px) {
   .banner {
     align-items: stretch;
@@ -53,5 +65,16 @@
 
   .actions {
     justify-content: flex-end;
+  }
+
+  .installLabel {
+    display: none;
+  }
+
+  .installButton {
+    width: 44px;
+    min-width: 44px;
+    justify-content: center;
+    padding: 0;
   }
 }

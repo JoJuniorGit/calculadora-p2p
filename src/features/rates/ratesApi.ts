@@ -1,5 +1,9 @@
 const DOLAR_API_URL = 'https://ve.dolarapi.com/v1/dolares';
+const BINANCE_SERVER_URL = '/api/binance-rate';
+const CRIPTOYA_BINANCE_URL = 'https://criptoya.com/api/binancep2p/USDT/VES/1';
+const YADIO_RATES_URL = 'https://api.yadio.io/exrates/USD';
 const REQUEST_TIMEOUT_MS = 8_000;
+const FALLBACK_TIMEOUT_MS = 6_000;
 
 export interface FetchedRate {
   value: number;
@@ -214,16 +218,131 @@ export function fetchBcvRate(): Promise<FetchedRate> {
   return fetchDolarApiRate('oficial');
 }
 
+async function fetchCriptoyaBinanceRate(): Promise<FetchedRate> {
+  const service = 'CriptoYa (Binance P2P)';
+
+  return withTimeout(
+    service,
+    async (signal) => {
+      const response = await fetch(CRIPTOYA_BINANCE_URL, {
+        headers: { Accept: 'application/json' },
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new RateApiError(`${service} respondió con el estado ${response.status}.`, 'http');
+      }
+
+      const payload: unknown = await response.json();
+      if (!isRecord(payload)) {
+        throw new RateApiError(`${service} devolvió una respuesta con formato inválido.`, 'format');
+      }
+
+      const value = parsePositiveNumber(payload.bid) ?? parsePositiveNumber(payload.ask);
+      if (value === null) {
+        throw new RateApiError(`${service} no devolvió una tasa válida.`, 'data');
+      }
+
+      return { value, provider: service };
+    },
+    FALLBACK_TIMEOUT_MS,
+  );
+}
+
+async function fetchYadioRate(): Promise<FetchedRate> {
+  const service = 'Yadio (USD/VES)';
+
+  return withTimeout(
+    service,
+    async (signal) => {
+      const response = await fetch(YADIO_RATES_URL, {
+        headers: { Accept: 'application/json' },
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new RateApiError(`${service} respondió con el estado ${response.status}.`, 'http');
+      }
+
+      const payload: unknown = await response.json();
+      if (!isRecord(payload) || !isRecord(payload.USD)) {
+        throw new RateApiError(`${service} devolvió una respuesta con formato inválido.`, 'format');
+      }
+
+      const value = parsePositiveNumber(payload.USD.VES);
+      if (value === null) {
+        throw new RateApiError(`${service} no devolvió una tasa válida.`, 'data');
+      }
+
+      return { value, provider: service };
+    },
+    FALLBACK_TIMEOUT_MS,
+  );
+}
+
+async function fetchBinanceServerRate(): Promise<FetchedRate> {
+  const service = 'Binance P2P (proxy)';
+
+  return withTimeout(
+    service,
+    async (signal) => {
+      const response = await fetch(BINANCE_SERVER_URL, {
+        headers: { Accept: 'application/json' },
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new RateApiError(`${service} respondió con el estado ${response.status}.`, 'http');
+      }
+
+      const payload: unknown = await response.json();
+      if (!isRecord(payload)) {
+        throw new RateApiError(`${service} devolvió una respuesta con formato inválido.`, 'format');
+      }
+
+      const value = parsePositiveNumber(payload.value);
+      if (value === null) {
+        throw new RateApiError(`${service} no devolvió una tasa válida.`, 'data');
+      }
+
+      return {
+        value,
+        provider:
+          typeof payload.provider === 'string' && payload.provider.trim() !== ''
+            ? payload.provider
+            : service,
+      };
+    },
+    FALLBACK_TIMEOUT_MS,
+  );
+}
+
+function getBinanceRateSources(): Array<() => Promise<FetchedRate>> {
+  const sources: Array<() => Promise<FetchedRate>> = [];
+  sources.push(import.meta.env.DEV ? fetchBinanceProxyRate : fetchBinanceServerRate);
+  sources.push(
+    fetchCriptoyaBinanceRate,
+    () => fetchDolarApiRate('paralelo'),
+    fetchYadioRate,
+  );
+  return sources;
+}
+
 export async function fetchBinanceRate(): Promise<FetchedRate> {
-  if (import.meta.env.DEV) {
+  const failures: string[] = [];
+
+  for (const source of getBinanceRateSources()) {
     try {
-      return await fetchBinanceProxyRate();
-    } catch {
-      // The CORS-enabled DolarApi source remains available when the dev proxy fails.
+      return await source();
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : 'Error desconocido.');
     }
   }
 
-  return fetchDolarApiRate('paralelo');
+  throw new RateApiError(
+    `No se pudo obtener la tasa Binance P2P desde ninguna de las APIs de respaldo. ${failures.join(' ')}`,
+    'network',
+  );
 }
 
 const HISTORY_API_BASE = 'https://dolar-vzla.rafnixg.dev/api/v1/history';

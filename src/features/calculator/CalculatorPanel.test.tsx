@@ -225,6 +225,25 @@ describe('CalculatorPanel bank profile priority', () => {
     );
   });
 
+  it('hides the interbank quick fact when the profile has it disabled', () => {
+    const quickFacts = container.querySelector(
+      '[aria-label="Resumen del perfil bancario"]',
+    );
+
+    expect(quickFacts?.textContent).toContain('Tarjeta');
+    expect(quickFacts?.textContent).not.toContain('Interbancario');
+  });
+
+  it('shows the interbank quick fact when the profile has it enabled', () => {
+    renderFreshWithProfiles([secondProfile]);
+    const quickFacts = container.querySelector(
+      '[aria-label="Resumen del perfil bancario"]',
+    );
+
+    expect(quickFacts?.textContent).toContain('Interbancario');
+    expect(quickFacts?.textContent).not.toContain('off');
+  });
+
   it('offers a copy action for the investment value', () => {
     const copyButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Copiar inversión en Bs.S"]',

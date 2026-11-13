@@ -43,6 +43,7 @@ describe('app store hydration', () => {
 
     expect(useAppStore.getState().theme).toBe('dark');
     expect(useAppStore.getState().rates.bcv.value).toBe(52);
+    expect(useAppStore.getState().profiles).toEqual([]);
     expect(useAppStore.getState().disclaimer.text).toBe('Aviso de prueba');
     expect(useAppStore.getState().tableColumnWidths).toEqual({ investment: 180 });
   });

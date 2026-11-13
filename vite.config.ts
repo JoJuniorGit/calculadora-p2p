@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Pure client-side SPA. The dev proxy avoids CORS while querying Binance P2P;
-// static production builds fall back to the CORS-enabled DolarApi endpoint.
+// the Vercel function at /api/binance-rate does the same in production, with
+// CORS-enabled aggregators (CriptoYa, DolarApi, Yadio) as fallbacks.
 export default defineConfig({
   plugins: [
     react(),
@@ -22,7 +23,7 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         theme_color: '#0f62fe',
-        background_color: '#f8fafc',
+        background_color: '#e9edf2',
         icons: [
           {
             src: 'pwa-192x192.png',

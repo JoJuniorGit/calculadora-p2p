@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from './store/useAppStore';
 import { Button } from './components/ui/Button';
 import { PwaNotices } from './components/pwa/PwaNotices';
+import { InstallButton } from './components/pwa/InstallButton';
+import { promptInstall, requestInstallHelp } from './components/pwa/installSupport';
+import { useInstallPromptState } from './components/pwa/useInstallPrompt';
 import {
   getExchangeGap,
   PROFITABILITY_GREEN_MIN_PCT,
@@ -15,6 +18,7 @@ import { RatesPanel } from './features/rates/RatesPanel';
 import { useInitialRates } from './features/rates/useInitialRates';
 import { SettingsPanel } from './features/settings/SettingsPanel';
 import { formatPct } from './utils/format';
+import { applyTheme } from './utils/theme';
 import styles from './App.module.css';
 
 type AppTab = 'rates' | 'profiles' | 'calculator' | 'records' | 'converter';
@@ -101,6 +105,7 @@ export default function App() {
   const rates = useAppStore((state) => state.rates);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
   const setDisclaimer = useAppStore((state) => state.setDisclaimer);
+  const installState = useInstallPromptState();
   const [activeTab, setActiveTab] = useState<AppTab>(readStoredTab);
   const [showDisclaimer, setShowDisclaimer] = useState(
     () => !useAppStore.getState().disclaimer.hasSeen,
@@ -125,7 +130,7 @@ export default function App() {
           : styles.tickerValueDanger;
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    applyTheme(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -156,12 +161,66 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const handleBrandInstall = (): void => {
+    if (installState === 'available') {
+      void promptInstall();
+      return;
+    }
+    if (installState === 'ios') requestInstallHelp();
+  };
+
+  const brandInstallable = installState === 'available' || installState === 'ios';
+  const brandMark = (
+    <span className={styles.brandMark} aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none" focusable="false">
+        <path
+          d="M9 12.25h13"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M18.5 8.5l4 3.75-4 3.75"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M23 19.75H10"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M13.5 16l-4 3.75 4 3.75"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
+
   return (
     <main className={styles.app}>
       <div className={styles.shell}>
         <header className={styles.header}>
           <div className={styles.brand}>
-            <span className={styles.brandMark} aria-hidden="true">P2P</span>
+            {brandInstallable ? (
+              <button
+                type="button"
+                className={styles.brandInstall}
+                onClick={handleBrandInstall}
+                title="Instalar la app"
+                aria-label="Instalar la app"
+              >
+                {brandMark}
+              </button>
+            ) : (
+              brandMark
+            )}
             <div className={styles.brandCopy}>
               <h1>Calculadora P2P</h1>
               <p>Arbitraje USD/VES</p>
@@ -185,6 +244,7 @@ export default function App() {
           </nav>
 
           <div className={styles.headerActions}>
+            <InstallButton />
             <Button
               variant="secondary"
               className={styles.themeToggle}

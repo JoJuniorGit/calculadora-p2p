@@ -5,6 +5,7 @@ import { StorageErrorScreen } from './components/StorageErrorScreen';
 import { pruneStoredRateHistoryCache } from './features/rates/rateHistoryCache';
 import { migrateLegacyStorage } from './storage/indexedDb';
 import { useAppStore } from './store/useAppStore';
+import { applyTheme } from './utils/theme';
 import './styles/global.css';
 
 async function bootstrap(): Promise<void> {
@@ -45,7 +46,7 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
-  document.documentElement.dataset.theme = useAppStore.getState().theme;
+  applyTheme(useAppStore.getState().theme);
 
   try {
     await pruneStoredRateHistoryCache();

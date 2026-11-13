@@ -18,15 +18,124 @@
       content="Calculadora local de arbitraje USD/VES con tasas BCV y Binance P2P."
     />
     <title>Calculadora P2P — Arbitraje USD/VES</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      .boot-screen {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 2rem;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+          Arial, sans-serif;
+        text-align: center;
+        color: #37424f;
+        background-color: #e9edf2;
+        background-image:
+          radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.7) 0, transparent 55%),
+          radial-gradient(ellipse at 85% 105%, rgba(36, 94, 234, 0.07) 0, transparent 60%);
+      }
+
+      .boot-card {
+        display: grid;
+        justify-items: center;
+        gap: 0.85rem;
+        animation: boot-fade 600ms ease-out both;
+      }
+
+      .boot-mark {
+        width: 34px;
+        height: 34px;
+        margin-bottom: 0.15rem;
+        border-radius: 50%;
+        border: 2px solid rgba(55, 66, 79, 0.16);
+        border-top-color: #3a6bd1;
+        animation: boot-spin 900ms linear infinite;
+      }
+
+      .boot-title {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .boot-caption {
+        margin: 0;
+        font-size: 0.8rem;
+        letter-spacing: 0.04em;
+        color: #556377;
+      }
+
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+      }
+
+      :root[data-theme='dark'] .boot-screen {
+        color: #e8eef7;
+        background-color: #080d14;
+        background-image:
+          radial-gradient(ellipse at 50% -10%, rgba(87, 151, 255, 0.16) 0, transparent 55%),
+          radial-gradient(ellipse at 85% 105%, rgba(47, 103, 184, 0.12) 0, transparent 60%);
+      }
+
+      :root[data-theme='dark'] .boot-mark {
+        border-color: rgba(152, 168, 187, 0.18);
+        border-top-color: #6aa5ff;
+        box-shadow: 0 0 18px rgba(87, 151, 255, 0.18);
+      }
+
+      :root[data-theme='dark'] .boot-caption {
+        color: #98a8bb;
+      }
+
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes boot-fade {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-card,
+        .boot-mark {
+          animation: none;
+        }
+      }
+    </style>
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('calculadora-p2p-theme') === 'dark') {
+            document.documentElement.dataset.theme = 'dark';
+          }
+        } catch (error) {
+          // Storage unavailable: keep the light boot screen.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root">
-      <div
-        role="status"
-        aria-live="polite"
-        style="min-height:100vh;display:grid;place-items:center;padding:2rem;font-family:system-ui,sans-serif;color:#475569;background:#f8fafc"
-      >
-        Cargando Calculadora P2P…
+      <div role="status" aria-live="polite" class="boot-screen">
+        <div class="boot-card">
+          <span class="boot-mark" aria-hidden="true"></span>
+          <p class="boot-title">Calculadora P2P</p>
+          <p class="boot-caption">Cargando…</p>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -43,7 +44,9 @@ import { InfoTooltip } from '../../components/ui/InfoTooltip';
 import { SelectField } from '../../components/ui/SelectField';
 import { PurchaseAccreditationModal } from './PurchaseAccreditationModal';
 import { PurchaseDetailModal } from './PurchaseDetailModal';
+import { PurchaseInlineDetail } from './PurchaseInlineDetail';
 import { PurchaseRowActions } from './PurchaseRowActions';
+import { formatSignedPct, getPurchasePnl, type PurchasePnl } from './purchasePnl';
 import { RegisterSaleModal } from '../sales/RegisterSaleModal';
 import { SaleDetailModal } from '../sales/SaleDetailModal';
 import { filterPurchases } from './purchaseFilters';
@@ -188,125 +191,6 @@ function Pagination({
       </div>
     </nav>
   );
-}
-
-interface PurchaseOutcome {
-  bsOut: number;
-  profitBs: number;
-  roiPct: number;
-}
-
-function getPurchaseOutcome(purchase: PurchaseRecord): PurchaseOutcome | null {
-  if (
-    purchase.realizedRevenueVes !== undefined &&
-    (purchase.status === 'completed' ||
-      purchase.status === 'partial' ||
-      (purchase.soldUsdt ?? 0) > 0)
-  ) {
-    const allocatedCost = purchase.allocatedCostVesTotal ?? 0;
-    return {
-      bsOut: purchase.realizedRevenueVes,
-      profitBs: purchase.realizedProfitVes ?? 0,
-      roiPct:
-        allocatedCost > 0
-          ? ((purchase.realizedProfitVes ?? 0) / allocatedCost) * 100
-          : 0,
-    };
-  }
-
-  if (purchase.status === 'completed' && purchase.execution) {
-    return {
-      bsOut: purchase.execution.executedBsOut,
-      profitBs: purchase.execution.executedProfitBs,
-      roiPct: purchase.execution.executedRoiPct,
-    };
-  }
-
-  return null;
-}
-
-function getSaleRate(purchase: PurchaseRecord): number {
-  if (purchase.execution?.realBinanceRate) return purchase.execution.realBinanceRate;
-  if ((purchase.weightedAverageSellRateVes ?? 0) > 0) {
-    return purchase.weightedAverageSellRateVes as number;
-  }
-
-  const snapshotRate = purchase.snapshot.binanceRate || purchase.binanceRate;
-  return purchase.snapshot.slippageEnabled
-    ? snapshotRate * (1 - purchase.snapshot.slippagePct / 100)
-    : snapshotRate;
-}
-
-type PnlState = 'projected' | 'partial' | 'realized';
-
-interface PurchasePnl {
-  state: PnlState;
-  /** Resultado in Bs.S: projected revenue or the realized revenue so far. */
-  resultVes: number;
-  /** Net profit in Bs.S: projected profit or the realized profit so far. */
-  profitVes: number;
-  roiPct: number;
-  /** USDT net worth selling in Binance, used by the projected result. */
-  netUsd?: number;
-  soldUsdt?: number;
-  totalUsdt?: number;
-  /** Share of the lot already sold, used by the partial subtitle. */
-  soldPct?: number;
-}
-
-function formatSignedPct(value: number): string {
-  const label = formatPct(value);
-  return value > 0 ? `+${label}` : label;
-}
-
-/** USDT net that reaches the Binance wallet, derived from the purchase snapshot. */
-function getProjectedNetUsd(purchase: PurchaseRecord, snapshotRate: number): number {
-  const snapshotNet = purchase.snapshot.usdtNet;
-  if (typeof snapshotNet === 'number' && snapshotNet > 0) return snapshotNet;
-  if (snapshotRate > 0 && purchase.estimatedBsOut > 0) {
-    return purchase.estimatedBsOut / snapshotRate;
-  }
-  return purchase.usdDeposited;
-}
-
-/**
- * Floating PnL (projected at the current Binance rate) versus realized PnL
- * (FIFO sales already executed). Cancelled purchases have no PnL at all.
- */
-function getPurchasePnl(
-  purchase: PurchaseRecord,
-  currentBinanceRate: number,
-): PurchasePnl | null {
-  if (purchase.status === 'cancelled') return null;
-
-  const outcome = getPurchaseOutcome(purchase);
-  if (outcome) {
-    const soldUsdt = purchase.soldUsdt ?? 0;
-    const totalUsdt = purchase.initialBinanceUsdt ?? purchase.usdDeposited;
-    return {
-      state: purchase.status === 'completed' ? 'realized' : 'partial',
-      resultVes: outcome.bsOut,
-      profitVes: outcome.profitBs,
-      roiPct: outcome.roiPct,
-      soldUsdt,
-      totalUsdt,
-      soldPct: totalUsdt > 0 ? (soldUsdt / totalUsdt) * 100 : 0,
-    };
-  }
-
-  const snapshotRate = getSaleRate(purchase);
-  const rate = currentBinanceRate > 0 ? currentBinanceRate : snapshotRate;
-  const netUsd = getProjectedNetUsd(purchase, snapshotRate);
-  const resultVes = netUsd * rate;
-  const profitVes = resultVes - purchase.totalCostBs;
-
-  return {
-    state: 'projected',
-    resultVes,
-    profitVes,
-    roiPct: purchase.totalCostBs > 0 ? (profitVes / purchase.totalCostBs) * 100 : 0,
-    netUsd,
-  };
 }
 
 function renderResultCell(pnl: PurchasePnl | null): ReactNode {
@@ -642,6 +526,7 @@ export function PurchasesPanel() {
   const [deleteSaleTargetId, setDeleteSaleTargetId] = useState<string | null>(null);
   const [registerSaleOpen, setRegisterSaleOpen] = useState(false);
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
+  const [expandedPurchaseId, setExpandedPurchaseId] = useState<string | null>(null);
   const [dataNotice, setDataNotice] = useState<DataNotice | null>(null);
   const [recordView, setRecordView] = useState<'purchases' | 'sales'>('purchases');
   const [purchasePage, setPurchasePage] = useState(1);
@@ -1064,7 +949,7 @@ export function PurchasesPanel() {
         actions={
           <div className={styles.recordsHeaderActions}>
             <Button variant="secondary" onClick={() => setRegisterSaleOpen(true)}>
-              Registrar venta P2P
+              Registrar Venta
             </Button>
             <span className={styles.resultCount}>{filteredPurchases.length} resultados</span>
           </div>
@@ -1134,20 +1019,47 @@ export function PurchasesPanel() {
                     const inventory = getInventoryData(purchase);
                     const inventoryNote = getStatusInventoryNote(purchase, inventory);
                     const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled') ?? null;
+                    const isExpanded = expandedPurchaseId === purchase.id;
                     return (
-                      <tr key={purchase.id}>
+                      <Fragment key={purchase.id}>
+                      <tr>
                         <td className={styles.bankCell}>
-                          <div className={styles.bankCellContent}>
-                            <span className={styles.bankName}>{purchase.profileName}</span>
-                            <time
-                              className={styles.purchaseDate}
-                              dateTime={getPurchaseDateTime(purchase)}
+                          <div className={styles.bankCellLayout}>
+                            <button
+                              type="button"
+                              className={styles.expandToggle}
+                              aria-expanded={isExpanded}
+                              aria-controls={`purchase-inline-${purchase.id}`}
+                              aria-label={`${isExpanded ? 'Ocultar' : 'Ver'} detalle de ${purchase.profileName}`}
+                              onClick={() =>
+                                setExpandedPurchaseId(isExpanded ? null : purchase.id)
+                              }
                             >
-                              {getPurchaseDateLabel(purchase)}
-                            </time>
-                            <span className={styles.purchaseRateSource}>
-                              {getPurchaseRateSourceLabel(purchase)}
-                            </span>
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                                focusable="false"
+                              >
+                                <path d="M9 6l6 6-6 6" />
+                              </svg>
+                            </button>
+                            <div className={styles.bankCellContent}>
+                              <span className={styles.bankName}>{purchase.profileName}</span>
+                              <time
+                                className={styles.purchaseDate}
+                                dateTime={getPurchaseDateTime(purchase)}
+                              >
+                                {getPurchaseDateLabel(purchase)}
+                              </time>
+                              <span className={styles.purchaseRateSource}>
+                                {getPurchaseRateSourceLabel(purchase)}
+                              </span>
+                            </div>
                           </div>
                         </td>
                         <td className={`${styles.numericCell} ${styles.centerCell}`}>
@@ -1206,6 +1118,17 @@ export function PurchasesPanel() {
                           />
                         </td>
                       </tr>
+                      {isExpanded && (
+                        <tr className={styles.detailRow} id={`purchase-inline-${purchase.id}`}>
+                          <td colSpan={TABLE_COLUMNS.length}>
+                            <PurchaseInlineDetail
+                              purchase={purchase}
+                              pnl={pnl}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -1224,22 +1147,94 @@ export function PurchasesPanel() {
                 const pnl = getPurchasePnl(purchase, currentBinanceRate);
                 const inventory = getInventoryData(purchase);
                 const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled') ?? null;
+                const isExpanded = expandedPurchaseId === purchase.id;
+                const resultHint = pnl
+                  ? pnl.state === 'projected'
+                    ? 'Proyectado P2P'
+                    : pnl.state === 'partial'
+                      ? `Parcial · ${Math.round(pnl.soldPct ?? 0)}% vendido`
+                      : '✓ Real'
+                  : '—';
+                const profitHint = pnl
+                  ? pnl.state === 'projected'
+                    ? `Est. · ${formatPct(pnl.roiPct)}`
+                    : pnl.state === 'partial'
+                      ? `Parcial · ${formatSignedPct(pnl.roiPct)}`
+                      : `✓ Real · ${formatSignedPct(pnl.roiPct)}`
+                  : '—';
+                const resultTone = pnl
+                  ? pnl.state === 'projected'
+                    ? styles.mobileProjectedValue
+                    : pnl.state === 'realized'
+                      ? styles.mobileRealizedValue
+                      : ''
+                  : '';
+                const profitTone = pnl
+                  ? pnl.state === 'projected'
+                    ? styles.mobileProjectedValue
+                    : pnl.profitVes < 0
+                      ? styles.negativeValue
+                      : styles.positiveValue
+                  : '';
+                const binanceHint = inventory
+                  ? pnl?.state === 'projected' && typeof pnl.netUsd === 'number'
+                    ? `~ ${formatAmount(pnl.netUsd)} USD netos`
+                    : (purchase.soldUsdt ?? 0) > 0
+                      ? `${formatAmount(purchase.soldUsdt ?? 0)} USDT vendidos`
+                      : ''
+                  : '';
+
                 return (
-                  <article className={styles.mobileCard} key={purchase.id}>
+                  <article
+                    className={styles.mobileCard}
+                    key={purchase.id}
+                    onClick={() => setSelectedPurchaseId(purchase.id)}
+                  >
                     <header className={styles.mobileCardHeader}>
                       <div className={styles.mobileIdentity}>
-                        <h3>{purchase.profileName}</h3>
-                         <time dateTime={getPurchaseDateTime(purchase)}>
-                           {getPurchaseDateLabel(purchase)}
-                         </time>
-                         <span className={styles.purchaseRateSource}>
-                           {getPurchaseRateSourceLabel(purchase)}
-                         </span>
+                        <div className={styles.mobileBankRow}>
+                          <button
+                            type="button"
+                            className={styles.expandToggle}
+                            aria-expanded={isExpanded}
+                            aria-controls={`purchase-mobile-inline-${purchase.id}`}
+                            aria-label={`${isExpanded ? 'Ocultar' : 'Ver'} detalle de ${purchase.profileName}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpandedPurchaseId(isExpanded ? null : purchase.id);
+                            }}
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                              focusable="false"
+                            >
+                              <path d="M9 6l6 6-6 6" />
+                            </svg>
+                          </button>
+                          <h3>{purchase.profileName}</h3>
+                        </div>
+                        <p className={styles.mobileMeta}>
+                          <time dateTime={getPurchaseDateTime(purchase)}>
+                            {getPurchaseDateLabel(purchase)}
+                          </time>
+                          <span aria-hidden="true">·</span>
+                          <span>{getPurchaseRateSourceLabel(purchase)}</span>
+                        </p>
                       </div>
-                      <div className={styles.mobileStatusActions}>
+                      <div
+                        className={styles.mobileStatusActions}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
                         <StatusBadge status={purchase.status} />
                         <PurchaseRowActions
-                           purchaseLabel={`${purchase.profileName}, ${getPurchaseDateLabel(purchase)}`}
+                          purchaseLabel={`${purchase.profileName}, ${getPurchaseDateLabel(purchase)}`}
                           nextStatus={nextStatus}
                           open={openActionsId === purchase.id}
                           onOpenChange={(open) => setOpenActionsId(open ? purchase.id : null)}
@@ -1254,50 +1249,64 @@ export function PurchasesPanel() {
                     <dl className={styles.mobileDetails}>
                       <div>
                         <dt>Inversión (Bs.S)</dt>
-                        <dd className={styles.mobileValueStack}>
-                          <MoneyStack
-                            primary={formatAmount(purchase.totalCostBs)}
-                            secondary={formatUsd(purchase.usdBought)}
-                          />
-                          {purchase.accreditationType === 'PARTIAL' && (
-                            <span
-                              className={styles.partialBadge}
-                              title={getPartialAccreditationTitle(purchase)}
-                            >
-                              Parcial ({formatPct(purchase.accreditationRatePercent)})
-                            </span>
-                          )}
+                        <dd className={styles.mobileCell}>
+                          <span className={styles.mobileCellValue}>
+                            {formatAmount(purchase.totalCostBs)}
+                          </span>
+                          <span className={styles.mobileCellHint}>
+                            {formatUsd(purchase.usdBought)}
+                          </span>
                         </dd>
                       </div>
                       <div>
                         <dt>En Binance</dt>
-                        <dd>
-                          {inventory ? (
-                            <MoneyStack
-                              primary={formatUsdt(inventory.remainingUsdt)}
-                              secondary={formatBs(inventory.remainingCostVes)}
-                            />
-                          ) : (
-                            '-'
+                        <dd className={styles.mobileCell}>
+                          <span className={styles.mobileCellValue}>
+                            {inventory ? `${formatAmount(inventory.remainingUsdt)} USDT` : '—'}
+                          </span>
+                          {binanceHint !== '' && (
+                            <span className={styles.mobileCellHint}>{binanceHint}</span>
                           )}
                         </dd>
                       </div>
                       <div>
                         <dt>Resultado (Bs.S)</dt>
-                        <dd aria-label={pnl ? undefined : 'Resultado no disponible'}>
-                          {renderResultCell(pnl)}
+                        <dd className={styles.mobileCell}>
+                          <span
+                            className={`${styles.mobileCellValue} ${resultTone}`}
+                            aria-label={pnl ? undefined : 'Resultado no disponible'}
+                          >
+                            {pnl
+                              ? `${pnl.state === 'projected' ? '~ ' : ''}${formatAmount(pnl.resultVes)}`
+                              : '—'}
+                          </span>
+                          <span className={styles.mobileCellHint}>{resultHint}</span>
                         </dd>
                       </div>
                       <div>
                         <dt>Ganancia (Bs.S)</dt>
-                        <dd
-                          className={styles.emphasisCell}
-                          aria-label={pnl ? undefined : 'Ganancia no disponible'}
-                        >
-                          {renderProfitCell(pnl)}
+                        <dd className={styles.mobileCell}>
+                          <span
+                            className={`${styles.mobileCellValue} ${profitTone}`}
+                            aria-label={pnl ? undefined : 'Ganancia no disponible'}
+                          >
+                            {pnl
+                              ? `${pnl.state === 'projected' ? '~ ' : ''}${formatAmount(pnl.profitVes)}`
+                              : '—'}
+                          </span>
+                          <span className={styles.mobileCellHint}>{profitHint}</span>
                         </dd>
                       </div>
                     </dl>
+                    {isExpanded && (
+                      <div
+                        className={styles.mobileDetail}
+                        id={`purchase-mobile-inline-${purchase.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <PurchaseInlineDetail purchase={purchase} pnl={pnl} />
+                      </div>
+                    )}
                   </article>
                 );
               })}
@@ -1323,7 +1332,7 @@ export function PurchasesPanel() {
         className={salesStyles.salesCard}
         actions={
           <Button variant="secondary" onClick={() => setRegisterSaleOpen(true)}>
-            Registrar venta P2P
+            Registrar Venta
           </Button>
         }
       >

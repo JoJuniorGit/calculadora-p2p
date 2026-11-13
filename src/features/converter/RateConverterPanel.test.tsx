@@ -74,13 +74,64 @@ afterEach(() => {
 });
 
 describe('RateConverterPanel', () => {
-  it('keeps the edited field raw and updates the two passive fields', () => {
-    setInputValue(getInput('converter-ves'), '11730');
+  it('formats the edited field with ATM digits and updates the two passive fields', () => {
+    setInputValue(getInput('converter-ves'), '1173000');
 
-    expect(getInput('converter-ves').value).toBe('11730');
+    expect(getInput('converter-ves').value).toBe('11.730,00');
     expect(getInput('converter-slot-1').value).toBe('293,25');
     expect(getInput('converter-slot-2').value).toBe('255,00');
     expect(container.textContent).toContain('Diferencia: 38,25 USD');
+  });
+
+  it('shifts typed digits from right to left in the active field', () => {
+    setInputValue(getInput('converter-ves'), '1');
+    expect(getInput('converter-ves').value).toBe('0,01');
+
+    setInputValue(getInput('converter-ves'), '0,015');
+    expect(getInput('converter-ves').value).toBe('0,15');
+  });
+
+  it('selects the current value on focus and replaces it with the typed digits', () => {
+    setInputValue(getInput('converter-ves'), '1173000');
+    const slot1 = getInput('converter-slot-1');
+    act(() => {
+      slot1.focus();
+    });
+
+    expect(slot1.value).toBe('293,25');
+    expect(slot1.selectionStart).toBe(0);
+    expect(slot1.selectionEnd).toBe(slot1.value.length);
+
+    setInputValue(slot1, '5');
+
+    expect(getInput('converter-slot-1').value).toBe('0,05');
+    expect(getInput('converter-ves').value).toBe('2,00');
+  });
+
+  it('ignores the previous value when typing appends after focus', () => {
+    setInputValue(getInput('converter-ves'), '1173000');
+    const slot1 = getInput('converter-slot-1');
+    act(() => {
+      slot1.focus();
+    });
+
+    setInputValue(slot1, '293,255');
+
+    expect(getInput('converter-slot-1').value).toBe('0,05');
+  });
+
+  it('clears the whole prefilled value on delete', () => {
+    setInputValue(getInput('converter-ves'), '1173000');
+    const slot1 = getInput('converter-slot-1');
+    act(() => {
+      slot1.focus();
+    });
+
+    setInputValue(slot1, '');
+
+    expect(getInput('converter-slot-1').value).toBe('');
+    expect(getInput('converter-ves').value).toBe('');
+    expect(getInput('converter-slot-2').value).toBe('');
   });
 
   it('swaps the slot rates when picking the rate already used by the other slot', () => {
@@ -104,7 +155,7 @@ describe('RateConverterPanel', () => {
   });
 
   it('clears all three fields when the active input is emptied', () => {
-    setInputValue(getInput('converter-ves'), '11730');
+    setInputValue(getInput('converter-ves'), '1173000');
     expect(getInput('converter-slot-2').value).toBe('255,00');
 
     setInputValue(getInput('converter-ves'), '');
@@ -117,7 +168,7 @@ describe('RateConverterPanel', () => {
   it('applies quick USD amounts to the primary USD slot', () => {
     clickButton('$100');
 
-    expect(getInput('converter-slot-1').value).toBe('100');
+    expect(getInput('converter-slot-1').value).toBe('100,00');
     expect(getInput('converter-ves').value).toBe('4.000,00');
     expect(getInput('converter-slot-2').value).toBe('86,96');
   });
