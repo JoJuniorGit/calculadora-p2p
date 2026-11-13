@@ -372,7 +372,7 @@ describe('CalculatorPanel bank profile priority', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain('Referencia diaria');
     expect(container.textContent).toContain('50,00 Bs.S/USD');
-    expect(container.textContent).toContain('70,00 Bs.S/USD');
+    expect(container.textContent).toContain('70,00 Bs.S/USDT');
 
     const amountInput = container.querySelector<HTMLInputElement>(
       'input[name="calculator-amount"]',
@@ -447,7 +447,7 @@ describe('CalculatorPanel bank profile priority', () => {
     setInputValue(binanceInput as HTMLInputElement, '700000');
     setInputValue(amountInput as HTMLInputElement, '100000');
     expect(rateSummary?.textContent).toContain('50,00 Bs.S/USD');
-    expect(rateSummary?.textContent).toContain('70,00 Bs.S/USD');
+    expect(rateSummary?.textContent).toContain('70,00 Bs.S/USDT');
 
     clickButton('Registrar compra');
     expect(container.textContent).toContain('Ganancia');

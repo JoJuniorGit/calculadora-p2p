@@ -57,7 +57,7 @@ export function PurchaseInlineDetail({ purchase, pnl }: PurchaseInlineDetailProp
         <InfoTooltip
           label={`Qué significa el estado ${stateLabel}`}
           content={estimateTooltip}
-          align="center"
+          align="end"
         />
       )}
     </span>
@@ -95,7 +95,7 @@ export function PurchaseInlineDetail({ purchase, pnl }: PurchaseInlineDetailProp
             </div>
             <div>
               <dt>Tasa Binance P2P</dt>
-              <dd>{`${formatRate(purchase.binanceRate)} Bs.S/USD`}</dd>
+              <dd>{`${formatRate(purchase.binanceRate)} Bs.S/USDT`}</dd>
             </div>
           </dl>
         </section>

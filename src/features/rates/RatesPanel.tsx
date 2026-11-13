@@ -63,7 +63,7 @@ function RateCard({
           <span className={styles.updatedAt}>Última actualización: {formatDateTime(rate.updatedAt)}</span>
         </div>
         <NumberField
-          label="Tasa en Bs.S por USD"
+          label={`Tasa en Bs.S por ${rateKey === 'binance' ? 'USDT' : 'USD'}`}
           name={`${rateKey}-rate`}
           value={value}
           onChange={onValueChange}
@@ -212,7 +212,7 @@ export function RatesPanel() {
         />
         <RateCard
           rateKey="binance"
-          title="Tasa Binance P2P (Bs.S/USD)"
+          title="Tasa Binance P2P (Bs.S/USDT)"
           rate={binance}
           value={inputValues.binance}
           loading={loadingKey === 'binance'}

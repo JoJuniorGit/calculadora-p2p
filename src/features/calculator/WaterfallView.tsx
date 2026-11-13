@@ -1,5 +1,5 @@
 import type { WaterfallKind, WaterfallLine } from '../../domain/types';
-import { formatBs, formatUsd } from '../../utils/format';
+import { formatBs, formatUsd, formatUsdt } from '../../utils/format';
 import styles from './WaterfallView.module.css';
 
 interface WaterfallViewProps {
@@ -22,12 +22,14 @@ export function WaterfallView({ lines }: WaterfallViewProps) {
   return (
     <div className={styles.tableViewport} tabIndex={0} aria-label="Tabla con desplazamiento horizontal">
       <table className={styles.table}>
-        <caption className={styles.visuallyHidden}>Desglose por concepto en Bs.S y USD</caption>
+        <caption className={styles.visuallyHidden}>
+          Desglose por concepto en Bs.S, USD y USDT
+        </caption>
         <thead>
           <tr>
             <th scope="col">Concepto</th>
             <th scope="col">Monto en Bs.S</th>
-            <th scope="col">Monto en USD</th>
+            <th scope="col">Monto en USD/USDT</th>
           </tr>
         </thead>
         <tbody>
@@ -53,7 +55,11 @@ export function WaterfallView({ lines }: WaterfallViewProps) {
                   {line.amountBs === null ? '—' : formatBs(line.amountBs)}
                 </td>
                 <td className={getAmountClassName(line.amountUsd, line.kind)}>
-                  {line.amountUsd === null ? '—' : formatUsd(line.amountUsd)}
+                  {line.amountUsd === null
+                    ? '—'
+                    : line.unit === 'USDT'
+                      ? formatUsdt(line.amountUsd)
+                      : formatUsd(line.amountUsd)}
                 </td>
               </tr>
             );

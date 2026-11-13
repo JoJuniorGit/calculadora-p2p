@@ -231,7 +231,7 @@ export function RateConverterPanel() {
               <InfoTooltip
                 label="Cómo funciona el conversor de tasas"
                 content="Convierte entre bolívares y hasta dos tasas simultáneas. El campo que edites es la base de cálculo y los otros dos se recalculan al instante."
-                align="center"
+                align="end"
               />
             </span>
           </div>
@@ -328,7 +328,7 @@ export function RateConverterPanel() {
                       </select>
                       <span className={styles.rateValue}>
                         {slotRate > 0
-                          ? `${formatRate(slotRate)} Bs.S/USD`
+                          ? `${formatRate(slotRate)} Bs.S/${unit}`
                           : 'Sin configurar'}
                       </span>
                     </>
@@ -364,7 +364,9 @@ export function RateConverterPanel() {
         <div className={styles.equivalenceHeader}>
           <h2 className={styles.equivalenceTitle}>Equivalencia y poder de compra</h2>
           {usingReference && (
-            <span className={styles.referenceTag}>Referencia por cada $100 USD</span>
+            <span className={styles.referenceTag}>
+              Referencia por cada $100 {descriptor1.unit}
+            </span>
           )}
         </div>
 

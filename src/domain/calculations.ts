@@ -514,6 +514,7 @@ function createWaterfall(
       amountBs: null,
       amountUsd: -result.binancePercentFeeUsd,
       kind: 'cost',
+      unit: 'USDT',
     },
     {
       key: 'usdt-net',
@@ -521,6 +522,7 @@ function createWaterfall(
       amountBs: null,
       amountUsd: result.usdDeposited,
       kind: 'subtotal',
+      unit: 'USDT',
     },
   );
 
@@ -531,6 +533,7 @@ function createWaterfall(
       amountBs: -result.binanceFixedDiscountBs,
       amountUsd: -(result.usdDeposited - result.usdtNet),
       kind: 'cost',
+      unit: 'USDT',
       detail: 'Valorada a la tasa efectiva de venta, no a BCV',
     });
   }
@@ -542,6 +545,7 @@ function createWaterfall(
       amountBs: null,
       amountUsd: result.usdtNet,
       kind: 'subtotal',
+      unit: 'USDT',
     },
   );
 

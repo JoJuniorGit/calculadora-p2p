@@ -34,6 +34,7 @@ import {
   formatDateOnly,
   formatPct,
   formatUsd,
+  formatUsdt,
   toLocalDateKey,
 } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
@@ -206,7 +207,7 @@ function renderResultCell(pnl: PurchasePnl | null): ReactNode {
           ~ {formatAmount(pnl.resultVes)}
         </span>
         <span className={`${styles.pnlNote} ${styles.projectedNote}`}>
-          ~ {formatAmount(pnl.netUsd ?? 0)} USD netos
+          ~ {formatAmount(pnl.netUsd ?? 0)} USDT netos
         </span>
       </span>
     );
@@ -449,10 +450,6 @@ function MoneyStack({
 
 function formatCount(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function formatUsdt(value: number): string {
-  return `${formatAmount(value)} USDT`;
 }
 
 function getPurchaseDateLabel(purchase: PurchaseRecord): string {
@@ -1178,7 +1175,7 @@ export function PurchasesPanel() {
                   : '';
                 const binanceHint = inventory
                   ? pnl?.state === 'projected' && typeof pnl.netUsd === 'number'
-                    ? `~ ${formatAmount(pnl.netUsd)} USD netos`
+                    ? `~ ${formatAmount(pnl.netUsd)} USDT netos`
                     : (purchase.soldUsdt ?? 0) > 0
                       ? `${formatAmount(purchase.soldUsdt ?? 0)} USDT vendidos`
                       : ''

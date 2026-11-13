@@ -104,6 +104,8 @@ export interface WaterfallLine {
   amountBs: number | null;
   /** Signed amount in USD; null when the line is not expressed in USD. */
   amountUsd: number | null;
+  /** Display unit for amountUsd; defaults to USD. */
+  unit?: 'USD' | 'USDT';
   kind: WaterfallKind;
   detail?: string;
 }

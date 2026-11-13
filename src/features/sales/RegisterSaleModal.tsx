@@ -5,7 +5,7 @@ import {
 } from '../../domain/calculations';
 import type { SaleRecord } from '../../domain/types';
 import { useAppStore } from '../../store/useAppStore';
-import { formatAmount, formatBs, formatPct, formatRate, formatUsd } from '../../utils/format';
+import { formatAmount, formatBs, formatPct, formatRate, formatUsdt } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { NumberField } from '../../components/ui/NumberField';
@@ -121,12 +121,12 @@ export function RegisterSaleModal({ open, onClose, onRegistered }: RegisterSaleM
         <div className={styles.summaryRow}>
           <div className={styles.summaryItem}>
             <span className={styles.summaryLabel}>Disponible en Binance</span>
-            <strong className={styles.summaryValue}>{formatUsd(availableUsdt)}</strong>
+            <strong className={styles.summaryValue}>{formatUsdt(availableUsdt)}</strong>
           </div>
           <div className={styles.summaryItem}>
             <span className={styles.summaryLabel}>Comisión fija P2P por venta</span>
             <strong className={styles.summaryValue}>
-              {formatUsd(DEFAULT_P2P_FIXED_FEE_USDT)}
+              {formatUsdt(DEFAULT_P2P_FIXED_FEE_USDT)}
             </strong>
           </div>
         </div>
@@ -224,13 +224,13 @@ export function RegisterSaleModal({ open, onClose, onRegistered }: RegisterSaleM
               <article className={styles.previewCard}>
                 <span className={styles.previewLabel}>USDT netos liquidados</span>
                 <strong className={styles.previewValue}>
-                  {formatUsd(preview.netUsdtLiquidated)}
+                  {formatUsdt(preview.netUsdtLiquidated)}
                 </strong>
               </article>
               <article className={styles.previewCard}>
                 <span className={styles.previewLabel}>Saldo después de la venta</span>
                 <strong className={styles.previewValue}>
-                  {formatUsd(preview.walletBalanceAfterUsdt)}
+                  {formatUsdt(preview.walletBalanceAfterUsdt)}
                 </strong>
               </article>
             </div>

@@ -172,7 +172,7 @@ describe('PurchasesPanel financial table', () => {
     expect(cells[1]).toContain('250,00 USD');
     expect(cells[1].indexOf('10.000,00')).toBeLessThan(cells[1].indexOf('USD'));
     expect(cells[2]).toContain('~ 11.730,00');
-    expect(cells[2]).toContain('~ 255,00 USD netos');
+    expect(cells[2]).toContain('~ 255,00 USDT netos');
     expect(cells[3]).toContain('~ 1.730,00');
     expect(cells[3]).toContain('Est. · 17,30%');
     expect(cells[4]).toContain('En espera');
@@ -631,7 +631,7 @@ describe('PurchasesPanel floating and realized PnL', () => {
     });
 
     expect(resultCell()?.textContent).toContain('~ 12.750,00');
-    expect(resultCell()?.textContent).toContain('~ 255,00 USD netos');
+    expect(resultCell()?.textContent).toContain('~ 255,00 USDT netos');
     expect(profitCell()?.textContent).toContain('~ 2.750,00');
     expect(profitCell()?.textContent).toContain('Est. · 27,50%');
     expect(resultCell()?.querySelector('[title*="Resultado estimado"]')).not.toBeNull();

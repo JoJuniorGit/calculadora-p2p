@@ -9,9 +9,10 @@ import {
   formatDateOnly,
   formatDateTime,
   formatPct,
-  formatPctWithFixedUsd,
+  formatPctWithFixedUsdt,
   formatRate,
   formatUsd,
+  formatUsdt,
   toLocalDateKey,
 } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
@@ -219,7 +220,7 @@ export function PurchaseDetailModal({
     { label: 'Costo total', value: formatBs(purchase.totalCostBs) },
     { label: 'USD comprados', value: formatUsd(purchase.usdBought) },
     { label: 'USD para Binance', value: formatUsd(purchase.usdForBinance) },
-    { label: 'USD depositados', value: formatUsd(purchase.usdDeposited) },
+    { label: 'USDT depositados', value: formatUsdt(purchase.usdDeposited) },
     { label: 'Bs.S esperados', value: formatBs(purchase.estimatedBsOut) },
     {
       label: 'Utilidad estimada y ROI',
@@ -227,7 +228,7 @@ export function PurchaseDetailModal({
     },
     {
       label: 'Tasa de equilibrio',
-      value: `${formatRate(purchase.breakEvenRate)} Bs.S/USD`,
+      value: `${formatRate(purchase.breakEvenRate)} Bs.S/USDT`,
     },
     { label: 'Modo', value: formatMode(purchase) },
     { label: 'Monto ingresado', value: formatInputAmount(purchase) },
@@ -270,7 +271,7 @@ export function PurchaseDetailModal({
 
   const snapshotItems: DetailItem[] = [
     { label: 'Tasa BCV', value: `${formatRate(snapshot.bcvRate)} Bs.S/USD` },
-    { label: 'Tasa Binance P2P', value: `${formatRate(snapshot.binanceRate)} Bs.S/USD` },
+    { label: 'Tasa Binance P2P', value: `${formatRate(snapshot.binanceRate)} Bs.S/USDT` },
     {
       label: 'Intervención',
       value: `${formatProfilePct(snapshot.interventionPct)} (fija) · ${formatBs(snapshot.interventionFeeBs)}`,
@@ -281,13 +282,13 @@ export function PurchaseDetailModal({
     },
     {
       label: 'Depósito Binance',
-      value: `${formatPctWithFixedUsd(snapshot.binanceDepositPct, snapshot.binanceDepositFixedUsd, Number.isInteger(snapshot.binanceDepositPct) ? 0 : 2)} · comisión aplicada ${formatUsd(appliedBinanceFee)}`,
+      value: `${formatPctWithFixedUsdt(snapshot.binanceDepositPct, snapshot.binanceDepositFixedUsd, Number.isInteger(snapshot.binanceDepositPct) ? 0 : 2)} · comisión aplicada ${formatUsdt(appliedBinanceFee)}`,
     },
     ...(hasAuditedSnapshot && snapshot.binanceDepositFixedUsd > 0
       ? [
           {
             label: 'Comisión fija P2P',
-            value: `${formatUsd(snapshot.binanceDepositFixedUsd)} · equivalente ${formatBs(snapshot.binanceFixedDiscountBs ?? 0)} a la tasa efectiva de venta`,
+            value: `${formatUsdt(snapshot.binanceDepositFixedUsd)} · equivalente ${formatBs(snapshot.binanceFixedDiscountBs ?? 0)} a la tasa efectiva de venta`,
           },
         ]
       : []),
@@ -295,7 +296,7 @@ export function PurchaseDetailModal({
       ? [
           {
             label: 'USDT netos para venta',
-            value: formatUsd(snapshot.usdtNet ?? 0),
+            value: formatUsdt(snapshot.usdtNet ?? 0),
           },
         ]
       : []),
@@ -317,7 +318,7 @@ export function PurchaseDetailModal({
     ? [
         {
           label: 'Tasa real de venta',
-          value: `${formatRate(purchase.execution.realBinanceRate)} Bs.S/USD`,
+          value: `${formatRate(purchase.execution.realBinanceRate)} Bs.S/USDT`,
         },
         { label: 'Bs.S ejecutados', value: formatBs(purchase.execution.executedBsOut) },
         { label: 'Ganancia ejecutada', value: formatBs(purchase.execution.executedProfitBs) },
@@ -348,13 +349,13 @@ export function PurchaseDetailModal({
             ? formatDateTime(purchase.fundedToBinanceAt)
             : '-',
         },
-        { label: 'USDT iniciales', value: formatUsd(initialInventoryUsdt) },
+        { label: 'USDT iniciales', value: formatUsdt(initialInventoryUsdt) },
         {
           label: 'Costo unitario en Binance',
           value: `${formatRate(purchase.unitCostInBinanceVes ?? 0)} Bs.S/USDT`,
         },
-        { label: 'USDT vendidos', value: formatUsd(purchase.soldUsdt ?? 0) },
-        { label: 'USDT restantes', value: formatUsd(purchase.remainingBinanceUsdt ?? 0) },
+    { label: 'USDT vendidos', value: formatUsdt(purchase.soldUsdt ?? 0) },
+    { label: 'USDT restantes', value: formatUsdt(purchase.remainingBinanceUsdt ?? 0) },
         {
           label: 'Costo asignado a ventas',
           value: formatBs(purchase.allocatedCostVesTotal ?? 0),

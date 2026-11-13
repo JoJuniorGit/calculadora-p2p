@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { formatAmount, formatBs, formatDateTime, formatPct, formatRate, formatUsd } from '../../utils/format';
+import { formatAmount, formatBs, formatDateTime, formatPct, formatRate, formatUsdt } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import styles from './sales.module.css';
@@ -46,15 +46,15 @@ export function SaleDetailModal({
   );
   const summary: DetailItem[] = [
     { label: 'Fecha', value: formatDateTime(sale.createdAt) },
-    { label: 'USDT vendidos', value: formatUsd(sale.totalUsdtSold) },
-    { label: 'Comisión fija P2P', value: formatUsd(sale.p2pFixedFeeUsdt) },
-    { label: 'USDT netos liquidados', value: formatUsd(sale.netUsdtLiquidated) },
+    { label: 'USDT vendidos', value: formatUsdt(sale.totalUsdtSold) },
+    { label: 'Comisión fija P2P', value: formatUsdt(sale.p2pFixedFeeUsdt) },
+    { label: 'USDT netos liquidados', value: formatUsdt(sale.netUsdtLiquidated) },
     { label: 'Tasa de venta', value: `${formatRate(sale.sellRateVes)} Bs.S/USDT` },
     { label: 'VES recibidos', value: formatBs(sale.totalVesReceived) },
     { label: 'Costo FIFO asignado', value: formatBs(sale.totalAllocatedCostVes) },
     { label: 'Ganancia realizada', value: formatBs(sale.totalRealizedProfitVes) },
     { label: 'ROI realizado', value: formatPct(sale.realizedRoiPercent) },
-    { label: 'Saldo de billetera después', value: formatUsd(sale.walletBalanceAfterUsdt) },
+    { label: 'Saldo de billetera después', value: formatUsdt(sale.walletBalanceAfterUsdt) },
   ];
 
   return (

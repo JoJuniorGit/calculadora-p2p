@@ -34,6 +34,10 @@ export function formatUsd(value: number): string {
   return `${formatAmount(value)} USD`;
 }
 
+export function formatUsdt(value: number): string {
+  return `${formatAmount(value)} USDT`;
+}
+
 export function formatPct(value: number, digits = 2): string {
   const formatter = new Intl.NumberFormat('es-VE', {
     minimumFractionDigits: digits,
@@ -42,18 +46,18 @@ export function formatPct(value: number, digits = 2): string {
   return `${formatter.format(value)}%`;
 }
 
-/** Formats a percentage and only appends a fixed USD charge when it is non-zero. */
-export function formatPctWithFixedUsd(
+/** Formats a percentage and only appends a fixed USDT charge when it is non-zero. */
+export function formatPctWithFixedUsdt(
   pct: number,
-  fixedUsd: number,
+  fixedUsdt: number,
   pctDigits = 2,
 ): string {
   const pctLabel = formatPct(pct, pctDigits);
-  if (!Number.isFinite(fixedUsd) || Number(fixedUsd.toFixed(2)) <= 0) {
+  if (!Number.isFinite(fixedUsdt) || Number(fixedUsdt.toFixed(2)) <= 0) {
     return pctLabel;
   }
 
-  return pct <= 0 ? formatUsd(fixedUsd) : `${pctLabel} + ${formatUsd(fixedUsd)}`;
+  return pct <= 0 ? formatUsdt(fixedUsdt) : `${pctLabel} + ${formatUsdt(fixedUsdt)}`;
 }
 
 export function formatRate(value: number): string {

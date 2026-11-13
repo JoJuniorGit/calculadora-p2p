@@ -21,7 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { BankProfile, BankProfileDraft } from '../../domain/types';
 import { DEFAULT_P2P_FIXED_FEE_USDT } from '../../domain/calculations';
-import { formatPct, formatPctWithFixedUsd } from '../../utils/format';
+import { formatPct, formatPctWithFixedUsdt } from '../../utils/format';
 import { useAppStore } from '../../store/useAppStore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -127,7 +127,7 @@ function ProfileCard({
           <dt className={styles.commissionLabel}>Binance</dt>
           <dd className={styles.commissionContent}>
             <strong className={styles.commissionValue}>
-              {formatPctWithFixedUsd(
+              {formatPctWithFixedUsdt(
                 profile.binanceDepositPct,
                 Math.max(profile.binanceDepositFixedUsd, DEFAULT_P2P_FIXED_FEE_USDT),
               )}
@@ -384,7 +384,7 @@ export function BankProfilesPanel() {
           <InfoTooltip
             label="Información sobre perfiles bancarios"
             content={headerHelp}
-            align="center"
+            align="end"
           />
         </div>
         {profiles.length > 0 ? (

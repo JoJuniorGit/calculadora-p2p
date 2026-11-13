@@ -14,9 +14,10 @@ import {
   formatBs,
   formatDateOnly,
   formatPct,
-  formatPctWithFixedUsd,
+  formatPctWithFixedUsdt,
   formatRate,
   formatUsd,
+  formatUsdt,
 } from '../../utils/format';
 import {
   fetchHistoricalRateForDate,
@@ -219,8 +220,10 @@ function getRateReferenceForDate(
   return undefined;
 }
 
-function displayRate(value: number): string {
-  return Number.isFinite(value) && value > 0 ? `${formatRate(value)} Bs.S/USD` : 'Sin configurar';
+function displayRate(value: number, unit: 'USD' | 'USDT' = 'USD'): string {
+  return Number.isFinite(value) && value > 0
+    ? `${formatRate(value)} Bs.S/${unit}`
+    : 'Sin configurar';
 }
 
 interface HeroSummaryProps {
@@ -788,7 +791,7 @@ export function CalculatorPanel() {
                     </span>
                     <span className={styles.quickFact} title="Comisión de depósito Binance">
                       Binance:{' '}
-                      {formatPctWithFixedUsd(
+                      {formatPctWithFixedUsdt(
                         selectedProfile.binanceDepositPct,
                         Math.max(
                           selectedProfile.binanceDepositFixedUsd,
@@ -914,7 +917,7 @@ export function CalculatorPanel() {
                       name="calculator-binance-rate"
                       value={historicalDraft.binance}
                       onChange={(value) => updateHistoricalRate('binance', value)}
-                      suffix="Bs.S/USD"
+                      suffix="Bs.S/USDT"
                       step={0.01}
                       decimals={4}
                       hint={
@@ -946,7 +949,7 @@ export function CalculatorPanel() {
               </div>
               <div className={styles.rateItem}>
                 <dt>Binance P2P</dt>
-                <dd>{displayRate(effectiveBinanceRate)}</dd>
+                <dd>{displayRate(effectiveBinanceRate, 'USDT')}</dd>
               </div>
               {exchangeGap && (
                 <div className={`${styles.rateItem} ${styles.rateItemFull}`}>
@@ -1082,7 +1085,7 @@ export function CalculatorPanel() {
               <article className={styles.metricCard}>
                 <span className={styles.metricLabel}>Punto de equilibrio (tasa mínima de venta)</span>
                 <strong className={styles.metricValue} data-testid="break-even-rate">
-                  {breakEvenRate === undefined ? '—' : `${formatRate(breakEvenRate)} Bs.S/USD`}
+                  {breakEvenRate === undefined ? '—' : `${formatRate(breakEvenRate)} Bs.S/USDT`}
                 </strong>
               </article>
               <article className={styles.metricCard}>
@@ -1107,7 +1110,7 @@ export function CalculatorPanel() {
               </article>
               <article className={styles.metricCard}>
                 <span className={styles.metricLabel}>USDT netos en billetera</span>
-                <strong className={styles.metricValue}>{formatUsd(result?.usdtNet ?? 0)}</strong>
+                <strong className={styles.metricValue}>{formatUsdt(result?.usdtNet ?? 0)}</strong>
               </article>
             </div>
 

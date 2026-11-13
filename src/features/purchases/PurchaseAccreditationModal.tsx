@@ -7,6 +7,7 @@ import {
   formatPct,
   formatRate,
   formatUsd,
+  formatUsdt,
   toInputNumber,
 } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
@@ -238,9 +239,9 @@ export function PurchaseAccreditationModal({
                 </strong>
               </article>
               <article className={styles.previewCard}>
-                <span className={styles.previewLabel}>USD netos en Binance</span>
+                <span className={styles.previewLabel}>USDT netos en Binance</span>
                 <strong className={styles.previewValue}>
-                  {formatUsd(preview.usdDeposited)}
+                  {formatUsdt(preview.usdDeposited)}
                 </strong>
               </article>
               <article className={styles.previewCard}>
@@ -266,7 +267,7 @@ export function PurchaseAccreditationModal({
               <article className={styles.previewCard}>
                 <span className={styles.previewLabel}>Tasa de equilibrio</span>
                 <strong className={styles.previewValue}>
-                  {formatRate(preview.breakEvenRate)} Bs.S/USD
+                  {formatRate(preview.breakEvenRate)} Bs.S/USDT
                 </strong>
               </article>
             </div>
