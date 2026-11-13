@@ -94,7 +94,7 @@ beforeEach(() => {
     purchases: [],
     sales: [],
     filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
-    disclaimer: { enabled: false, text: 'Aviso de prueba.' },
+    disclaimer: { text: 'Aviso de prueba.', hasSeen: true },
     theme: 'light',
   });
   const record = useAppStore.getState().recordPurchase(createInput());

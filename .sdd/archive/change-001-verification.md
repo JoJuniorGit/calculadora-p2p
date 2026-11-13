@@ -16,7 +16,7 @@
 | Command | Result |
 |---|---|
 | `npx tsc --noEmit` | PASS (exit 0) |
-| `npm run test` | PASS: 175 tests, 25 files |
+| `npm run test` | PASS: 179 tests, 25 files |
 | `npm run build` | PASS (exit 0) |
 | PWA build output | `manifest.webmanifest`, `sw.js`, Workbox precache generated |
 | Service worker route inspection | `NetworkOnly` for `ve.dolarapi.com`, `dolar-vzla.rafnixg.dev`, `/binance-api` |

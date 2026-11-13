@@ -8,13 +8,14 @@ import type {
   CalculationInput,
   PersistedState,
   PurchaseRecord,
+  SaleRecord,
 } from '../domain/types';
 import { SCHEMA_VERSION, useAppStore } from './useAppStore';
 
 const timestamp = '2024-01-02T03:04:05.000Z';
 const defaultDisclaimer = {
-  enabled: false,
   text: 'Esta herramienta es una simulación y no constituye asesoría financiera.',
+  hasSeen: false,
 };
 
 function createProfile(overrides: Partial<BankProfile> = {}): BankProfile {
@@ -109,6 +110,24 @@ function resetStore(): void {
     theme: 'light',
   });
   localStorage.clear();
+}
+
+/** Funds a purchase into Binance and registers a 100 USDT FIFO sale against it. */
+function createFundedSaleState(): { purchases: PurchaseRecord[]; sales: SaleRecord[] } {
+  const record = useAppStore.getState().recordPurchase(createInput());
+  useAppStore.getState().accreditPurchase(record.id, {
+    accreditationType: 'TOTAL',
+    accreditedUsd: record.requestedUsd,
+    keepInterbankSunk: true,
+  });
+  useAppStore.getState().changePurchaseStatus(record.id, 'usd_credited');
+  useAppStore.getState().changePurchaseStatus(record.id, 'deposited_binance');
+  useAppStore.getState().registerSale({ totalUsdtSold: 100, sellRateVes: 1_080 });
+
+  return {
+    purchases: useAppStore.getState().purchases,
+    sales: useAppStore.getState().sales,
+  };
 }
 
 describe('useAppStore profile order', () => {
@@ -470,6 +489,50 @@ describe('useAppStore imports', () => {
     expect(useAppStore.getState().purchases[0].notes).toBe('Actualizada');
   });
 
+  it('imports purchases together with their sales and replays FIFO', () => {
+    const exported = createFundedSaleState();
+
+    useAppStore.setState({ purchases: [], sales: [] });
+    const importedCount = useAppStore
+      .getState()
+      .importPurchases(exported.purchases, exported.sales);
+
+    expect(importedCount).toBe(1);
+    expect(useAppStore.getState().sales).toHaveLength(1);
+    expect(useAppStore.getState().sales[0].id).toBe(exported.sales[0].id);
+    const restored = useAppStore.getState().purchases[0];
+    expect(restored.status).toBe('partial');
+    expect(restored.soldUsdt).toBe(100);
+    expect(restored.remainingBinanceUsdt).toBe(exported.purchases[0].remainingBinanceUsdt);
+    expect(restored.allocations).toEqual(exported.purchases[0].allocations);
+  });
+
+  it('rejects an invalid sale without importing anything', () => {
+    const exported = createFundedSaleState();
+    const invalidSale = { ...exported.sales[0], totalUsdtSold: 0 };
+
+    useAppStore.setState({ purchases: [], sales: [] });
+    expect(() =>
+      useAppStore.getState().importPurchases(exported.purchases, [invalidSale]),
+    ).toThrow();
+
+    expect(useAppStore.getState().purchases).toEqual([]);
+    expect(useAppStore.getState().sales).toEqual([]);
+  });
+
+  it('fails the whole import when the sales exceed the available inventory', () => {
+    const exported = createFundedSaleState();
+    const unfundedPurchase = createPurchase('unfunded-purchase');
+
+    useAppStore.setState({ purchases: [], sales: [] });
+    expect(() =>
+      useAppStore.getState().importPurchases([unfundedPurchase], exported.sales),
+    ).toThrow(/Saldo insuficiente/);
+
+    expect(useAppStore.getState().purchases).toEqual([]);
+    expect(useAppStore.getState().sales).toEqual([]);
+  });
+
   it('replaces persisted config slices and resets filters', () => {
     const profile = createProfile({ id: 'imported-profile' });
     const purchase = createPurchase('imported-purchase');
@@ -482,7 +545,7 @@ describe('useAppStore imports', () => {
       profiles: [profile],
       purchases: [purchase],
       sales: [],
-      disclaimer: { enabled: true, text: 'Aviso importado para pruebas.' },
+      disclaimer: { text: 'Aviso importado para pruebas.', hasSeen: true },
       theme: 'dark',
     };
 
@@ -526,5 +589,29 @@ describe('useAppStore persistence', () => {
     expect(useAppStore.getState().schemaVersion).toBe(1);
     expect(useAppStore.getState().rates).toEqual(legacyState.rates);
     expect(useAppStore.getState().theme).toBe('dark');
+  });
+
+  it('adds hasSeen false to legacy disclaimer configs', async () => {
+    const legacyState = {
+      rates: {
+        bcv: { value: 52, updatedAt: timestamp, source: 'manual' as const },
+        binance: { value: 57, updatedAt: timestamp, source: 'auto' as const },
+      },
+      profiles: [],
+      purchases: [],
+      disclaimer: { enabled: true, text: 'Aviso legado' },
+      theme: 'light' as const,
+    };
+    localStorage.setItem(
+      'calculadora-p2p',
+      JSON.stringify({ state: legacyState, version: 0 }),
+    );
+
+    await useAppStore.persist.rehydrate();
+
+    expect(useAppStore.getState().disclaimer).toEqual({
+      text: 'Aviso legado',
+      hasSeen: false,
+    });
   });
 });

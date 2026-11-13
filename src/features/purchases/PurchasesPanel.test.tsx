@@ -120,6 +120,17 @@ function clickButtonStartingWith(text: string): void {
   });
 }
 
+function setInputValue(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    'value',
+  )?.set;
+  act(() => {
+    setter?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
 function getPurchaseRows(): number {
   return container.querySelectorAll(
     'table[aria-label="Compras registradas"] tbody tr',
@@ -137,9 +148,8 @@ describe('PurchasesPanel financial table', () => {
     expect(getHeaders()).toEqual([
       'Banco',
       'Inversión',
-      'En Binance',
       'Resultado',
-      'Utilidad',
+      'Ganancia',
       'Estado',
       'Acciones',
     ]);
@@ -148,9 +158,9 @@ describe('PurchasesPanel financial table', () => {
     expect(cells[1]).toContain('10.000,00 Bs.S');
     expect(cells[1]).toContain('250,00 USD');
     expect(cells[1].indexOf('Bs.S')).toBeLessThan(cells[1].indexOf('USD'));
-    expect(cells[2]).toBe('-');
+    expect(cells[2]).toBe('');
     expect(cells[3]).toBe('');
-    expect(cells[4]).toBe('');
+    expect(cells[4]).toContain('En espera');
     expect(container.querySelector('caption')).toBeNull();
   });
 
@@ -204,7 +214,7 @@ describe('PurchasesPanel financial table', () => {
     expect(mobileCards[1]?.textContent).toContain('Legada');
   });
 
-  it('shows the result after a sale and hides utility until completion', () => {
+  it('hides utility until completion and shows it after the sale', () => {
     act(() => {
       useAppStore.setState({
         purchases: [
@@ -220,10 +230,11 @@ describe('PurchasesPanel financial table', () => {
     });
 
     let cells = getDesktopCells();
-    expect(cells[3]).toContain('11.730,00 Bs.S');
-    expect(cells[3]).toContain('255,00 USD');
-    expect(cells[3].indexOf('Bs.S')).toBeLessThan(cells[3].indexOf('USD'));
-    expect(cells[4]).toBe('');
+    expect(cells[2]).toContain('11.730,00 Bs.S');
+    expect(cells[2]).toContain('255,00 USD');
+    expect(cells[2].indexOf('Bs.S')).toBeLessThan(cells[2].indexOf('USD'));
+    expect(cells[3]).toBe('');
+    expect(cells[4]).toContain('Parcial');
 
     act(() => {
       useAppStore.setState({
@@ -240,12 +251,75 @@ describe('PurchasesPanel financial table', () => {
     });
 
     cells = getDesktopCells();
-    expect(cells[3]).toContain('11.730,00 Bs.S');
-    expect(cells[3]).toContain('255,00 USD');
-    expect(cells[3].indexOf('Bs.S')).toBeLessThan(cells[3].indexOf('USD'));
-    expect(cells[4]).toContain('37,61 USD');
-    expect(cells[4]).toContain('17,30%');
-    expect(cells[4]).not.toContain('Bs.S');
+    expect(cells[2]).toContain('11.730,00 Bs.S');
+    expect(cells[2]).toContain('255,00 USD');
+    expect(cells[2].indexOf('Bs.S')).toBeLessThan(cells[2].indexOf('USD'));
+    expect(cells[3]).toContain('37,61 USD');
+    expect(cells[3]).toContain('17,30%');
+    expect(cells[3]).not.toContain('Bs.S');
+    expect(cells[4]).toContain('Completo');
+  });
+
+  it('shows the remaining USDT in the status column for Binance and partial purchases', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: [
+          createPurchase({
+            status: 'deposited_binance',
+            initialBinanceUsdt: 250,
+            remainingBinanceUsdt: 250,
+            remainingCostVes: 10_000,
+          }),
+        ],
+      });
+    });
+
+    let statusCell = container.querySelector('tbody tr td:nth-child(5)');
+    expect(statusCell?.textContent).toContain('En Binance');
+    expect(statusCell?.textContent).toContain('250,00 USDT');
+
+    const depositedNote = statusCell?.querySelector(
+      'span[title^="Costo restante"]',
+    );
+    expect(depositedNote?.getAttribute('aria-label')).toContain(
+      'Costo restante: 10.000,00 Bs.S',
+    );
+
+    act(() => {
+      useAppStore.setState({
+        purchases: [
+          createPurchase({
+            status: 'partial',
+            initialBinanceUsdt: 250,
+            remainingBinanceUsdt: 120,
+            remainingCostVes: 4_800,
+          }),
+        ],
+      });
+    });
+
+    statusCell = container.querySelector('tbody tr td:nth-child(5)');
+    expect(statusCell?.textContent).toContain('Parcial');
+    expect(statusCell?.textContent).toContain('120,00 USDT');
+
+    act(() => {
+      useAppStore.setState({
+        purchases: [
+          createPurchase({
+            status: 'completed',
+            initialBinanceUsdt: 250,
+            remainingBinanceUsdt: 0,
+            remainingCostVes: 0,
+          }),
+        ],
+      });
+    });
+
+    statusCell = container.querySelector('tbody tr td:nth-child(5)');
+    expect(statusCell?.textContent).toContain('Completo');
+    expect(
+      statusCell?.querySelector('span[title^="Costo restante"]'),
+    ).toBeNull();
   });
 
   it('offers a quick advance button before the kebab menu', () => {
@@ -385,5 +459,108 @@ describe('PurchasesPanel financial table', () => {
 
     expect(getSaleRows()).toBe(1);
     expect(container.textContent).toContain('Página 2 de 2');
+  });
+});
+
+describe('PurchasesPanel sales registration and data import', () => {
+  it('offers registering a sale from the purchases section', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: [createPurchase({ status: 'deposited_binance' })],
+      });
+    });
+
+    clickButton('Registrar venta P2P');
+
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(container.textContent).toContain('USDT a vender');
+    expect(container.textContent).toContain('Confirmar venta');
+  });
+
+  it('registers a sale from the purchases section and reveals it in the sales view', () => {
+    act(() => {
+      useAppStore.setState({
+        purchases: [createPurchase({ status: 'deposited_binance' })],
+      });
+    });
+
+    clickButton('Registrar venta P2P');
+
+    const [usdtInput, rateInput] = [
+      ...container.querySelectorAll<HTMLInputElement>('input[role="spinbutton"]'),
+    ];
+    // NumberField stores digits with implied decimals: 10000 -> 100.00 USDT.
+    setInputValue(usdtInput, '10000');
+    setInputValue(rateInput, '10000000');
+    clickButton('Confirmar venta');
+
+    expect(useAppStore.getState().sales).toHaveLength(1);
+    expect(getPurchaseRows()).toBe(0);
+    expect(getSaleRows()).toBe(1);
+    expect(
+      container.querySelector('table[aria-label="Ventas P2P registradas"]'),
+    ).not.toBeNull();
+  });
+
+  it('imports the sales included in a records file together with their purchases', async () => {
+    const payload = JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: '2024-01-02T12:00:00.000Z',
+      purchases: [
+        createPurchase({
+          id: 'imported-purchase',
+          status: 'deposited_binance',
+          snapshot: {
+            profileId: 'profile-1',
+            profileName: 'Banco Test',
+            mode: 'bs',
+            inputAmount: 10_000,
+            amountBs: 10_000,
+            bcvRate: 40,
+            binanceRate: 46,
+            interventionPct: 0,
+            interventionFeeBs: 0,
+            netForPurchaseBs: 10_000,
+            cardCommissionPct: 2,
+            cardCommissionBase: 'usd',
+            cardCommissionUsd: 0,
+            cardCommissionBs: 0,
+            binanceDepositPct: 1,
+            binanceDepositFixedUsd: 0.5,
+            binanceDepositUsd: 0,
+            interbankEnabled: false,
+            interbankPct: 0.3,
+            interbankBase: 'initial',
+            interbankCostBs: 0,
+            igtfEnabled: false,
+            igtfPct: 3,
+            igtfBase: 'card',
+            igtfCostBs: 0,
+            slippageEnabled: false,
+            slippagePct: 2,
+          },
+        }),
+      ],
+      sales: [createSale('imported-sale')],
+    });
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    if (!input) return;
+    const file = new File([payload], 'registros.json', { type: 'application/json' });
+    // jsdom ships File without Blob.text(); the browser provides it natively.
+    Object.defineProperty(file, 'text', { value: async () => payload, configurable: true });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+
+    await act(async () => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(useAppStore.getState().sales.map((sale) => sale.id)).toEqual(['imported-sale']);
+    expect(useAppStore.getState().purchases.map((purchase) => purchase.id)).toEqual([
+      'purchase-1',
+      'imported-purchase',
+    ]);
+    expect(useAppStore.getState().purchases[1].status).toBe('partial');
+    expect(container.textContent).toContain('Se importaron 1 compras y 1 ventas.');
   });
 });

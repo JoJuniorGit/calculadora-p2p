@@ -103,7 +103,7 @@ const persistedState: PersistedState = {
   profiles: [profile],
   purchases: [purchase],
   sales: [],
-  disclaimer: { enabled: false, text: '' },
+  disclaimer: { text: '', hasSeen: false },
   theme: 'light',
 };
 

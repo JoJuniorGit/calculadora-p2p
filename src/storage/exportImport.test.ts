@@ -6,6 +6,7 @@ import type {
   CalculationInput,
   PersistedState,
   PurchaseRecord,
+  SaleRecord,
   StatusChange,
 } from '../domain/types';
 import {
@@ -149,6 +150,40 @@ function createCompletedPurchase(): PurchaseRecord {
   };
 }
 
+function createSale(id: string, purchaseId: string): SaleRecord {
+  return {
+    id,
+    createdAt: '2024-01-03T10:00:00.000Z',
+    notes: 'Venta parcial, "primera"\ny segunda línea',
+    totalUsdtSold: 100,
+    p2pFixedFeeUsdt: 0.06,
+    netUsdtLiquidated: 99.94,
+    sellRateVes: 1_000,
+    totalVesReceived: 99_940,
+    totalAllocatedCostVes: 4_000,
+    totalRealizedProfitVes: 95_940,
+    realizedRoiPercent: 2_398.5,
+    walletBalanceAfterUsdt: 150,
+    allocations: [
+      {
+        allocationId: `${id}:${purchaseId}`,
+        saleId: id,
+        purchaseId,
+        allocatedAt: '2024-01-03T10:00:00.000Z',
+        usdtTaken: 100,
+        p2pFeeShareUsdt: 0.06,
+        netUsdtSold: 99.94,
+        sellRateVes: 1_000,
+        allocatedCostVes: 4_000,
+        allocatedRevenueVes: 99_940,
+        allocatedProfitVes: 95_940,
+        allocatedRoiPercent: 2_398.5,
+        lotRemainingUsdtAfter: 150,
+      },
+    ],
+  };
+}
+
 function createPersistedState(): PersistedState {
   const profile = createProfile();
 
@@ -161,7 +196,7 @@ function createPersistedState(): PersistedState {
     profiles: [profile],
     purchases: [createPurchase()],
     sales: [],
-    disclaimer: { enabled: false, text: 'Aviso de simulación para pruebas.' },
+    disclaimer: { text: 'Aviso de simulación para pruebas.', hasSeen: true },
     theme: 'light',
   };
 }
@@ -172,7 +207,17 @@ describe('purchase JSON exports', () => {
 
     expect(parsePurchasesJson(createPurchasesJsonExport([purchase]))).toEqual({
       ok: true,
-      data: [purchase],
+      data: { purchases: [purchase], sales: [] },
+    });
+  });
+
+  it('round-trips sales alongside their purchases', () => {
+    const purchase = createPurchase();
+    const sale = createSale('sale-1', purchase.id);
+
+    expect(parsePurchasesJson(createPurchasesJsonExport([purchase], [sale]))).toEqual({
+      ok: true,
+      data: { purchases: [purchase], sales: [sale] },
     });
   });
 
@@ -181,7 +226,7 @@ describe('purchase JSON exports', () => {
 
     expect(parsePurchasesJson(JSON.stringify([purchase]))).toEqual({
       ok: true,
-      data: [purchase],
+      data: { purchases: [purchase], sales: [] },
     });
   });
 
@@ -197,11 +242,21 @@ describe('purchase JSON exports', () => {
         purchases: [{ ...createPurchase(), id: '' }],
       }),
     );
+    const invalidSale = parsePurchasesJson(
+      JSON.stringify({
+        schemaVersion: 1,
+        exportedAt: timestamp,
+        purchases: [createPurchase()],
+        sales: [{ ...createSale('sale-1', 'purchase-1'), totalUsdtSold: 0 }],
+      }),
+    );
 
     expect(malformed.ok).toBe(false);
     expect(missingVersion.ok).toBe(false);
     expect(invalidRecord.ok).toBe(false);
     if (!invalidRecord.ok) expect(invalidRecord.errors.join(' ')).toContain('Registro 1');
+    expect(invalidSale.ok).toBe(false);
+    if (!invalidSale.ok) expect(invalidSale.errors.join(' ')).toContain('Venta 1');
   });
 });
 
@@ -211,7 +266,10 @@ describe('purchase CSV exports', () => {
     const csv = createPurchasesCsvExport([purchase]);
 
     expect(csv.startsWith('# schemaVersion=1\r\n')).toBe(true);
-    expect(parsePurchasesCsv(csv)).toEqual({ ok: true, data: [purchase] });
+    expect(parsePurchasesCsv(csv)).toEqual({
+      ok: true,
+      data: { purchases: [purchase], sales: [] },
+    });
   });
 
   it('round-trips historical purchase date and rate source', () => {
@@ -227,7 +285,38 @@ describe('purchase CSV exports', () => {
     });
     const csv = createPurchasesCsvExport([purchase]);
 
-    expect(parsePurchasesCsv(csv)).toEqual({ ok: true, data: [purchase] });
+    expect(parsePurchasesCsv(csv)).toEqual({
+      ok: true,
+      data: { purchases: [purchase], sales: [] },
+    });
+  });
+
+  it('round-trips a sales section after the purchase rows', () => {
+    const purchase = createPurchase();
+    const sale = createSale('sale-1', purchase.id);
+    const csv = createPurchasesCsvExport([purchase], [sale]);
+
+    expect(csv).toContain(`\r\n# sales=1\r\n`);
+    expect(parsePurchasesCsv(csv)).toEqual({
+      ok: true,
+      data: { purchases: [purchase], sales: [sale] },
+    });
+  });
+
+  it('rejects a sales row with an invalid numeric cell and reports its row number', () => {
+    const purchase = createPurchase();
+    const sale = createSale('sale-1', purchase.id);
+    const lines = createPurchasesCsvExport([purchase], [sale]).split('\r\n');
+    const salesHeaderIndex = lines.indexOf('# sales=1');
+    lines[salesHeaderIndex + 2] = lines[salesHeaderIndex + 2].replace(
+      ',100,',
+      ',not-a-number,',
+    );
+
+    const result = parsePurchasesCsv(lines.join('\r\n'));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(' ')).toContain(`Fila ${salesHeaderIndex + 3}`);
   });
 
   it('rejects a row with an invalid numeric cell and reports its row number', () => {

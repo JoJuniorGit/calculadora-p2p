@@ -33,6 +33,7 @@ import {
   normalizePurchasesPayload,
   persistedStateSchema,
   purchaseRecordSchema,
+  saleRecordSchema,
   withLegacyAccreditationDefaults,
 } from '../domain/validation';
 import { createId } from '../utils/id';
@@ -97,7 +98,7 @@ export interface AppState {
   setFilters(patch: Partial<PurchaseFilters>): void;
   resetFilters(): void;
 
-  importPurchases(records: PurchaseRecord[]): number;
+  importPurchases(records: PurchaseRecord[], sales?: SaleRecord[]): number;
   importConfig(config: PersistedState): void;
 }
 
@@ -111,7 +112,7 @@ function createPersistedDefaults(): PersistedState {
     profiles: [],
     purchases: [],
     sales: [],
-    disclaimer: { enabled: false, text: DEFAULT_DISCLAIMER_TEXT },
+    disclaimer: { text: DEFAULT_DISCLAIMER_TEXT, hasSeen: false },
     theme: 'light',
   };
 }
@@ -520,7 +521,7 @@ export const useAppStore = create<AppState>()(
 
       resetFilters: () => set({ filters: { ...DEFAULT_FILTERS } }),
 
-      importPurchases: (records) => {
+      importPurchases: (records, sales = []) => {
         const imported = records.map((record) => {
           const parsed = purchaseRecordSchema.safeParse(
             withLegacyAccreditationDefaults(record),
@@ -530,23 +531,49 @@ export const useAppStore = create<AppState>()(
           }
           return parsed.data;
         });
-
-        set((state) => {
-          const purchases = [...state.purchases];
-          const indexes = new Map(purchases.map((purchase, index) => [purchase.id, index]));
-
-          for (const purchase of imported) {
-            const existingIndex = indexes.get(purchase.id);
-            if (existingIndex === undefined) {
-              indexes.set(purchase.id, purchases.length);
-              purchases.push(purchase);
-            } else {
-              purchases[existingIndex] = purchase;
-            }
+        const importedSales = sales.map((sale) => {
+          const parsed = saleRecordSchema.safeParse(sale);
+          if (!parsed.success) {
+            throw new Error(formatZodIssues(parsed.error).join('; '));
           }
-
-          return { purchases };
+          return parsed.data;
         });
+
+        const purchases = [...get().purchases];
+        const indexes = new Map(purchases.map((purchase, index) => [purchase.id, index]));
+
+        for (const purchase of imported) {
+          const existingIndex = indexes.get(purchase.id);
+          if (existingIndex === undefined) {
+            indexes.set(purchase.id, purchases.length);
+            purchases.push(purchase);
+          } else {
+            purchases[existingIndex] = purchase;
+          }
+        }
+
+        if (importedSales.length === 0) {
+          set({ purchases });
+          return imported.length;
+        }
+
+        const mergedSales = [...get().sales];
+        const saleIndexes = new Map(mergedSales.map((sale, index) => [sale.id, index]));
+
+        for (const sale of importedSales) {
+          const existingIndex = saleIndexes.get(sale.id);
+          if (existingIndex === undefined) {
+            saleIndexes.set(sale.id, mergedSales.length);
+            mergedSales.push(sale);
+          } else {
+            mergedSales[existingIndex] = sale;
+          }
+        }
+
+        // Replay FIFO before writing so a failed import never leaves a
+        // half-merged journal behind.
+        const result = reconcileFifoInventory(purchases, mergedSales);
+        set({ purchases: result.purchases, sales: result.sales });
 
         return imported.length;
       },

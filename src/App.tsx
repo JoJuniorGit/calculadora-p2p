@@ -11,6 +11,7 @@ import { BankProfilesPanel } from './features/bankProfiles/BankProfilesPanel';
 import { CalculatorPanel } from './features/calculator/CalculatorPanel';
 import { PurchasesPanel } from './features/purchases/PurchasesPanel';
 import { RatesPanel } from './features/rates/RatesPanel';
+import { useInitialRates } from './features/rates/useInitialRates';
 import { SettingsPanel } from './features/settings/SettingsPanel';
 import { formatPct } from './utils/format';
 import styles from './App.module.css';
@@ -97,7 +98,12 @@ export default function App() {
   const disclaimer = useAppStore((state) => state.disclaimer);
   const rates = useAppStore((state) => state.rates);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
+  const setDisclaimer = useAppStore((state) => state.setDisclaimer);
   const [activeTab, setActiveTab] = useState<AppTab>(readStoredTab);
+  const [showDisclaimer, setShowDisclaimer] = useState(
+    () => !useAppStore.getState().disclaimer.hasSeen,
+  );
+  useInitialRates();
   const ratesConfigured =
     Number.isFinite(rates.bcv.value) &&
     rates.bcv.value > 0 &&
@@ -119,6 +125,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!useAppStore.getState().disclaimer.hasSeen) {
+      setDisclaimer({ hasSeen: true });
+    }
+  }, [setDisclaimer]);
 
   useEffect(() => {
     persistActiveTab(activeTab);
@@ -206,9 +218,14 @@ export default function App() {
           </span>
         </div>
 
-        {disclaimer.enabled && (
+        {showDisclaimer && (
           <aside className={styles.disclaimer} role="note">
-            {disclaimer.text}
+            <p>{disclaimer.text}</p>
+            <div className={styles.disclaimerActions}>
+              <Button variant="secondary" onClick={() => setShowDisclaimer(false)}>
+                Entendido
+              </Button>
+            </div>
           </aside>
         )}
 

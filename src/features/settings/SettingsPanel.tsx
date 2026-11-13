@@ -1,27 +1,20 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { PersistedState } from '../../domain/types';
 import { useAppStore } from '../../store/useAppStore';
 import {
   getStorageEstimate,
-  getStorageMigrationInfo,
-  isIndexedDbAvailable,
   isStoragePersisted,
   requestPersistentStorage,
-  type StorageMigrationInfo,
 } from '../../storage/indexedDb';
 import { createConfigJsonExport, downloadTextFile, parseConfigJson } from '../../storage/exportImport';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { ToggleField } from '../../components/ui/ToggleField';
-import fields from '../../components/ui/fields.module.css';
 import styles from './SettingsPanel.module.css';
 
 type Notice = { tone: 'success' | 'error'; message: string };
 
 interface StorageInfo {
-  indexedDb: boolean;
-  migration: StorageMigrationInfo | null;
   persisted: boolean;
   estimate: { usage: number; quota: number } | null;
 }
@@ -46,24 +39,20 @@ export function SettingsPanel() {
   const sales = useAppStore((state) => state.sales);
   const disclaimer = useAppStore((state) => state.disclaimer);
   const theme = useAppStore((state) => state.theme);
-  const setDisclaimer = useAppStore((state) => state.setDisclaimer);
   const importConfig = useAppStore((state) => state.importConfig);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pendingConfig, setPendingConfig] = useState<PersistedState | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [storageNotice, setStorageNotice] = useState<Notice | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const disclaimerTextId = useId();
 
   const loadStorageInfo = async (): Promise<void> => {
-    const [indexedDb, migration, persisted, estimate] = await Promise.all([
-      isIndexedDbAvailable(),
-      getStorageMigrationInfo(),
+    const [persisted, estimate] = await Promise.all([
       isStoragePersisted(),
       getStorageEstimate(),
     ]);
 
-    setStorageInfo({ indexedDb, migration, persisted, estimate });
+    setStorageInfo({ persisted, estimate });
   };
 
   useEffect(() => {
@@ -77,19 +66,19 @@ export function SettingsPanel() {
     if (result === 'granted') {
       setStorageNotice({
         tone: 'success',
-        message: 'El almacenamiento persistente quedó activado.',
+        message: 'La protección del almacenamiento local quedó activada.',
       });
       await loadStorageInfo();
     } else if (result === 'denied') {
       setStorageNotice({
         tone: 'error',
         message:
-          'El navegador no concedió el almacenamiento persistente. Mantené una copia JSON como respaldo.',
+          'El navegador no concedió la protección del almacenamiento local. Mantené una copia JSON como respaldo.',
       });
     } else {
       setStorageNotice({
         tone: 'error',
-        message: 'Este navegador no permite solicitar almacenamiento persistente.',
+        message: 'Este navegador no permite proteger el almacenamiento local.',
       });
     }
   };
@@ -151,22 +140,6 @@ export function SettingsPanel() {
     }
   };
 
-  const storageBackend =
-    storageInfo === null
-      ? 'Cargando…'
-      : storageInfo.indexedDb
-        ? 'IndexedDB'
-        : 'localStorage (respaldo)';
-  const storageMigration =
-    storageInfo === null
-      ? 'Cargando…'
-      : storageInfo.migration
-        ? storageInfo.migration.source === 'none'
-          ? 'Almacenamiento inicializado'
-          : 'Migración completada'
-        : storageInfo.indexedDb
-          ? 'Sin migración registrada'
-          : 'No disponible';
   const storagePersistent =
     storageInfo === null
       ? 'Cargando…'
@@ -189,32 +162,6 @@ export function SettingsPanel() {
           {notice.message}
         </div>
       )}
-
-      <Card title="Aviso de responsabilidad">
-        <div className={styles.disclaimerFields}>
-          <ToggleField
-            label="Mostrar aviso de responsabilidad"
-            checked={disclaimer.enabled}
-            onChange={(enabled) => setDisclaimer({ enabled })}
-            hint="El aviso está desactivado por defecto y solo se muestra cuando lo habilitas."
-          />
-          {disclaimer.enabled ? (
-            <div className={styles.textareaField}>
-              <label className={fields.label} htmlFor={disclaimerTextId}>
-                Texto del aviso
-              </label>
-              <textarea
-                id={disclaimerTextId}
-                className={fields.textarea}
-                value={disclaimer.text}
-                onChange={(event) => setDisclaimer({ text: event.currentTarget.value })}
-              />
-            </div>
-          ) : (
-            <p className={styles.hiddenNotice}>El aviso está oculto mientras esta opción esté desactivada.</p>
-          )}
-        </div>
-      </Card>
 
       <Card title="Configuración">
         <div className={styles.configActions}>
@@ -255,15 +202,7 @@ export function SettingsPanel() {
 
         <div className={styles.storageGrid}>
           <div className={styles.storageItem}>
-            <span className={styles.storageLabel}>Backend</span>
-            <strong className={styles.storageValue}>{storageBackend}</strong>
-          </div>
-          <div className={styles.storageItem}>
-            <span className={styles.storageLabel}>Migración</span>
-            <strong className={styles.storageValue}>{storageMigration}</strong>
-          </div>
-          <div className={styles.storageItem}>
-            <span className={styles.storageLabel}>Almacenamiento persistente</span>
+            <span className={styles.storageLabel}>Almacenamiento Local</span>
             <strong className={styles.storageValue}>{storagePersistent}</strong>
           </div>
           <div className={styles.storageItem}>
@@ -278,7 +217,7 @@ export function SettingsPanel() {
             onClick={() => void handlePersistStorage()}
             disabled={storageInfo?.persisted === true}
           >
-            Solicitar almacenamiento persistente
+            Proteger almacenamiento local
           </Button>
         </div>
         <p className={styles.helpText}>

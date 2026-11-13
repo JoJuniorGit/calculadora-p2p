@@ -1,16 +1,25 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App, { ACTIVE_TAB_STORAGE_KEY } from './App';
+import { clearInFlightRatesForTests } from './features/rates/rateRefresh';
 import { useAppStore } from './store/useAppStore';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+function jsonResponse(payload: unknown): Response {
+  return {
+    ok: true,
+    json: async () => payload,
+  } as Response;
+}
 
 let root: Root | null = null;
 let container: HTMLDivElement;
 
 beforeEach(() => {
   localStorage.clear();
+  clearInFlightRatesForTests();
   useAppStore.setState({
     schemaVersion: 1,
     rates: {
@@ -20,7 +29,7 @@ beforeEach(() => {
     profiles: [],
     purchases: [],
     filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
-    disclaimer: { enabled: false, text: 'Aviso de prueba.' },
+    disclaimer: { text: 'Aviso de prueba.', hasSeen: true },
     theme: 'light',
   });
   container = document.createElement('div');
@@ -34,6 +43,8 @@ afterEach(() => {
   });
   container.remove();
   root = null;
+  clearInFlightRatesForTests();
+  vi.unstubAllGlobals();
 });
 
 function clickButton(text: string): void {
@@ -76,6 +87,77 @@ describe('client render smoke', () => {
     expect(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)).toBe('records');
   });
 
+  it('shows the responsibility notice only on the first visit', () => {
+    act(() => {
+      useAppStore.setState({
+        disclaimer: { text: 'Aviso de primera vez.', hasSeen: false },
+      });
+    });
+
+    act(() => {
+      root?.render(<App />);
+    });
+
+    expect(container.textContent).toContain('Aviso de primera vez.');
+    expect(useAppStore.getState().disclaimer.hasSeen).toBe(true);
+
+    act(() => {
+      root?.unmount();
+    });
+    root = createRoot(container);
+    act(() => {
+      root?.render(<App />);
+    });
+
+    expect(container.textContent).not.toContain('Aviso de primera vez.');
+  });
+
+  it('loads missing rates automatically on frontend boot', async () => {
+    act(() => {
+      useAppStore.setState({
+        rates: {
+          bcv: { value: 0, updatedAt: null, source: 'manual' },
+          binance: { value: 0, updatedAt: null, source: 'manual' },
+        },
+      });
+    });
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/binance-api')) {
+        return Promise.resolve(
+          jsonResponse({ data: [{ adv: { price: '46.00' } }] }),
+        );
+      }
+      return Promise.resolve(
+        jsonResponse([
+          { fuente: 'oficial', promedio: 40 },
+          { fuente: 'paralelo', promedio: 46 },
+        ]),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    act(() => {
+      root?.render(<App />);
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(useAppStore.getState().rates.bcv).toMatchObject({
+      value: 40,
+      source: 'auto',
+    });
+    expect(useAppStore.getState().rates.binance).toMatchObject({
+      value: 46,
+      source: 'auto',
+    });
+    expect(container.textContent).toContain('40,00');
+    expect(container.textContent).toContain('46,00');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('renders storage diagnostics in the rates tab', async () => {
     act(() => {
       root?.render(<App />);
@@ -88,6 +170,10 @@ describe('client render smoke', () => {
     });
 
     expect(container.textContent).toContain('Almacenamiento y respaldo');
-    expect(container.textContent).toContain('Solicitar almacenamiento persistente');
+    expect(container.textContent).toContain('Almacenamiento Local');
+    expect(container.textContent).toContain('Proteger almacenamiento local');
+    expect(container.textContent).not.toContain('Aviso de responsabilidad');
+    expect(container.textContent).not.toContain('Backend');
+    expect(container.textContent).not.toContain('Migración');
   });
 });

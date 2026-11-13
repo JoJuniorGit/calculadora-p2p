@@ -1,16 +1,23 @@
-import type { PersistedState, PurchaseRecord } from '../domain/types';
+import type { PersistedState, PurchaseRecord, SaleRecord } from '../domain/types';
 import {
   configExportSchema,
   formatZodIssues,
   normalizePurchasesPayload,
   purchaseRecordSchema,
   purchasesExportSchema,
+  saleRecordSchema,
   withLegacyAccreditationDefaults,
 } from '../domain/validation';
 
 const SCHEMA_VERSION = 1;
 
 export type ImportResult<T> = { ok: true; data: T } | { ok: false; errors: string[] };
+
+/** Purchases plus the sales recorded against them, as parsed from a records file. */
+export interface RecordsImportData {
+  purchases: PurchaseRecord[];
+  sales: SaleRecord[];
+}
 
 const legacyPurchaseCsvColumns = [
   'id',
@@ -65,6 +72,26 @@ const currentPurchaseCsvColumns = [
 
 type PurchaseCsvColumn = (typeof currentPurchaseCsvColumns)[number];
 
+const salesCsvColumns = [
+  'id',
+  'createdAt',
+  'notes',
+  'totalUsdtSold',
+  'p2pFixedFeeUsdt',
+  'netUsdtLiquidated',
+  'sellRateVes',
+  'totalVesReceived',
+  'totalAllocatedCostVes',
+  'totalRealizedProfitVes',
+  'realizedRoiPercent',
+  'walletBalanceAfterUsdt',
+  'allocations',
+] as const;
+
+type SaleCsvColumn = (typeof salesCsvColumns)[number];
+
+const SALES_SECTION_MARKER = '# sales=1';
+
 interface CsvRow {
   fields: string[];
   line: number;
@@ -81,13 +108,15 @@ function jsonError(): ImportResult<never> {
 
 function formatPurchaseExportIssues(error: Parameters<typeof formatZodIssues>[0]): string[] {
   return error.issues.map((issue) => {
-    const purchaseIndex =
-      issue.path[0] === 'purchases' && typeof issue.path[1] === 'number'
+    const recordIndex =
+      typeof issue.path[1] === 'number' &&
+      (issue.path[0] === 'purchases' || issue.path[0] === 'sales')
         ? issue.path[1]
         : null;
-    if (purchaseIndex !== null) {
+    if (recordIndex !== null) {
+      const label = issue.path[0] === 'sales' ? 'Venta' : 'Registro';
       const field = issue.path.slice(2).map(String).join('.');
-      return `Registro ${purchaseIndex + 1}${field ? ` (${field})` : ''}: ${issue.message}`;
+      return `${label} ${recordIndex + 1}${field ? ` (${field})` : ''}: ${issue.message}`;
     }
 
     const path = issue.path.map(String).join('.');
@@ -140,7 +169,11 @@ function parseCsvRows(text: string): CsvParseResult {
     const character = text[index];
 
     if (!inQuotes && atLineStart && character === '#') {
+      const commentStart = index;
       while (index < text.length && text[index] !== '\r' && text[index] !== '\n') index += 1;
+      // Comments stay visible as single-field rows so section markers
+      // (e.g. `# sales=1`) can be detected by the caller.
+      rows.push({ fields: [text.slice(commentStart, index)], line: rowLine });
       if (index < text.length) {
         const lineBreakLength =
           text[index] === '\r' && text[index + 1] === '\n' ? 2 : 1;
@@ -242,7 +275,7 @@ function parseCsvRows(text: string): CsvParseResult {
   return { rows };
 }
 
-function parseJsonColumn(value: string, column: PurchaseCsvColumn, rowLine: number): unknown {
+function parseJsonColumn(value: string, column: string, rowLine: number): unknown {
   try {
     return JSON.parse(value) as unknown;
   } catch {
@@ -317,15 +350,45 @@ function parseCsvPurchase(
   return candidate;
 }
 
-export function createPurchasesJsonExport(purchases: PurchaseRecord[]): string {
+function parseCsvSale(fields: string[], rowLine: number): unknown {
+  const values = Object.fromEntries(
+    salesCsvColumns.map((column, index) => [column, fields[index]]),
+  ) as Record<string, string>;
+
+  return {
+    id: values.id,
+    createdAt: values.createdAt,
+    notes: values.notes,
+    totalUsdtSold: csvNumber(values.totalUsdtSold),
+    p2pFixedFeeUsdt: csvNumber(values.p2pFixedFeeUsdt),
+    netUsdtLiquidated: csvNumber(values.netUsdtLiquidated),
+    sellRateVes: csvNumber(values.sellRateVes),
+    totalVesReceived: csvNumber(values.totalVesReceived),
+    totalAllocatedCostVes: csvNumber(values.totalAllocatedCostVes),
+    totalRealizedProfitVes: csvNumber(values.totalRealizedProfitVes),
+    realizedRoiPercent: csvNumber(values.realizedRoiPercent),
+    walletBalanceAfterUsdt: csvNumber(values.walletBalanceAfterUsdt),
+    allocations: parseJsonColumn(values.allocations, 'allocations', rowLine),
+  };
+}
+
+export function createPurchasesJsonExport(
+  purchases: PurchaseRecord[],
+  sales: SaleRecord[] = [],
+): string {
   return JSON.stringify(
-    { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), purchases },
+    {
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      purchases,
+      sales,
+    },
     null,
     2,
   );
 }
 
-export function parsePurchasesJson(text: string): ImportResult<PurchaseRecord[]> {
+export function parsePurchasesJson(text: string): ImportResult<RecordsImportData> {
   let payload: unknown;
   try {
     payload = JSON.parse(text) as unknown;
@@ -333,17 +396,23 @@ export function parsePurchasesJson(text: string): ImportResult<PurchaseRecord[]>
     return jsonError();
   }
 
-  if (Array.isArray(payload)) return validatePurchaseArray(payload);
+  if (Array.isArray(payload)) {
+    const result = validatePurchaseArray(payload);
+    return result.ok ? { ok: true, data: { purchases: result.data, sales: [] } } : result;
+  }
 
   const parsed = purchasesExportSchema.safeParse(normalizePurchasesPayload(payload));
   if (!parsed.success) {
     return { ok: false, errors: formatPurchaseExportIssues(parsed.error) };
   }
 
-  return { ok: true, data: parsed.data.purchases };
+  return { ok: true, data: { purchases: parsed.data.purchases, sales: parsed.data.sales } };
 }
 
-export function createPurchasesCsvExport(purchases: PurchaseRecord[]): string {
+export function createPurchasesCsvExport(
+  purchases: PurchaseRecord[],
+  sales: SaleRecord[] = [],
+): string {
   const header = currentPurchaseCsvColumns.join(',');
   const rows = purchases.map((purchase) => {
     const values: Record<PurchaseCsvColumn, string> = {
@@ -386,17 +455,57 @@ export function createPurchasesCsvExport(purchases: PurchaseRecord[]): string {
     return currentPurchaseCsvColumns.map((column) => escapeCsvField(values[column])).join(',');
   });
 
-  return ['# schemaVersion=1', header, ...rows].join('\r\n');
+  const sections = ['# schemaVersion=1', header, ...rows];
+
+  if (sales.length > 0) {
+    const salesHeader = salesCsvColumns.join(',');
+    const salesRows = sales.map((sale) => {
+      const values: Record<SaleCsvColumn, string> = {
+        id: sale.id,
+        createdAt: sale.createdAt,
+        notes: sale.notes,
+        totalUsdtSold: String(sale.totalUsdtSold),
+        p2pFixedFeeUsdt: String(sale.p2pFixedFeeUsdt),
+        netUsdtLiquidated: String(sale.netUsdtLiquidated),
+        sellRateVes: String(sale.sellRateVes),
+        totalVesReceived: String(sale.totalVesReceived),
+        totalAllocatedCostVes: String(sale.totalAllocatedCostVes),
+        totalRealizedProfitVes: String(sale.totalRealizedProfitVes),
+        realizedRoiPercent: String(sale.realizedRoiPercent),
+        walletBalanceAfterUsdt: String(sale.walletBalanceAfterUsdt),
+        allocations: JSON.stringify(sale.allocations),
+      };
+
+      return salesCsvColumns.map((column) => escapeCsvField(values[column])).join(',');
+    });
+
+    sections.push(SALES_SECTION_MARKER, salesHeader, ...salesRows);
+  }
+
+  return sections.join('\r\n');
 }
 
-export function parsePurchasesCsv(text: string): ImportResult<PurchaseRecord[]> {
+export function parsePurchasesCsv(text: string): ImportResult<RecordsImportData> {
   const withoutBom = text.replace(/^\uFEFF/, '');
   const csv = parseCsvRows(withoutBom);
   if (csv.error) return { ok: false, errors: [csv.error] };
 
-  const rows = csv.rows.filter(
-    (row) => !(row.fields.length === 1 && row.fields[0].trim() === ''),
+  const isSkippedRow = (row: CsvRow): boolean => {
+    if (row.fields.length !== 1) return false;
+    const value = row.fields[0].trim();
+    return value === '' || value.startsWith('#');
+  };
+  const markerIndex = csv.rows.findIndex(
+    (row) => row.fields.length === 1 && row.fields[0].trim() === SALES_SECTION_MARKER,
   );
+  const rows = csv.rows
+    .slice(0, markerIndex === -1 ? csv.rows.length : markerIndex)
+    .filter((row) => !isSkippedRow(row));
+  const salesRows = (
+    markerIndex === -1 ? [] : csv.rows.slice(markerIndex + 1)
+  ).filter((row) => !isSkippedRow(row));
+
+  const errors: string[] = [];
   const header = rows[0];
   if (!header) return { ok: false, errors: ['El archivo CSV está vacío o no contiene encabezado.'] };
 
@@ -419,7 +528,6 @@ export function parsePurchasesCsv(text: string): ImportResult<PurchaseRecord[]> 
       ? purchaseCsvColumns
       : legacyPurchaseCsvColumns;
   const purchases: PurchaseRecord[] = [];
-  const errors: string[] = [];
 
   for (const row of rows.slice(1)) {
     if (row.fields.length !== columns.length) {
@@ -448,7 +556,48 @@ export function parsePurchasesCsv(text: string): ImportResult<PurchaseRecord[]> 
     purchases.push(parsed.data);
   }
 
-  return errors.length > 0 ? { ok: false, errors } : { ok: true, data: purchases };
+  const sales: SaleRecord[] = [];
+  if (markerIndex !== -1) {
+    const salesHeader = salesRows[0];
+    const hasSalesHeader =
+      salesHeader !== undefined &&
+      salesHeader.fields.length === salesCsvColumns.length &&
+      salesCsvColumns.every((column, index) => salesHeader.fields[index] === column);
+    if (!hasSalesHeader) {
+      errors.push(
+        `Fila ${salesHeader?.line ?? header.line}: el encabezado CSV de ventas no es válido.`,
+      );
+    } else {
+      for (const row of salesRows.slice(1)) {
+        if (row.fields.length !== salesCsvColumns.length) {
+          errors.push(
+            `Fila ${row.line}: se esperaban ${salesCsvColumns.length} columnas y se encontraron ${row.fields.length}.`,
+          );
+          continue;
+        }
+
+        let candidate: unknown;
+        try {
+          candidate = parseCsvSale(row.fields, row.line);
+        } catch (error) {
+          errors.push(
+            error instanceof Error ? error.message : `Fila ${row.line}: error al leer la fila.`,
+          );
+          continue;
+        }
+
+        const parsed = saleRecordSchema.safeParse(candidate);
+        if (!parsed.success) {
+          errors.push(`Fila ${row.line}: ${formatZodIssues(parsed.error).join('; ')}`);
+          continue;
+        }
+
+        sales.push(parsed.data);
+      }
+    }
+  }
+
+  return errors.length > 0 ? { ok: false, errors } : { ok: true, data: { purchases, sales } };
 }
 
 export function createConfigJsonExport(config: PersistedState): string {

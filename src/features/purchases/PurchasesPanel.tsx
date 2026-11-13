@@ -134,6 +134,18 @@ function toUsdEquivalent(valueBs: number, rate: number): number {
   return rate > 0 ? valueBs / rate : 0;
 }
 
+function getStatusInventoryNote(
+  purchase: PurchaseRecord,
+  inventory: ReturnType<typeof getInventoryData>,
+): string | null {
+  if (!inventory || inventory.remainingUsdt <= 0) return null;
+
+  if (purchase.status === 'deposited_binance' || purchase.status === 'partial') {
+    return formatUsdt(inventory.remainingUsdt);
+  }
+  return null;
+}
+
 function getInventoryData(purchase: PurchaseRecord): {
   remainingUsdt: number;
   initialUsdt: number;
@@ -331,13 +343,25 @@ export function PurchasesPanel() {
   const handleExport = (format: 'json' | 'csv'): void => {
     setDataNotice(null);
     try {
+      const exportedIds = new Set(filteredPurchases.map((purchase) => purchase.id));
+      const exportableSales = sales.filter(
+        (sale) =>
+          sale.allocations.length > 0 &&
+          sale.allocations.every((allocation) => exportedIds.has(allocation.purchaseId)),
+      );
       const content =
         format === 'json'
-          ? createPurchasesJsonExport(filteredPurchases)
-          : createPurchasesCsvExport(filteredPurchases);
+          ? createPurchasesJsonExport(filteredPurchases, exportableSales)
+          : createPurchasesCsvExport(filteredPurchases, exportableSales);
       const mime = format === 'json' ? 'application/json;charset=utf-8' : 'text/csv;charset=utf-8';
       downloadTextFile(`compras-p2p-${getTodayStamp()}.${format}`, content, mime);
-      setDataNotice({ tone: 'success', message: `Se exportaron ${filteredPurchases.length} resultados filtrados.` });
+      setDataNotice({
+        tone: 'success',
+        message:
+          exportableSales.length > 0
+            ? `Se exportaron ${filteredPurchases.length} compras y ${exportableSales.length} ventas.`
+            : `Se exportaron ${filteredPurchases.length} resultados filtrados.`,
+      });
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
       setDataNotice({ tone: 'error', message: `No se pudo exportar el archivo. ${detail}` });
@@ -366,8 +390,15 @@ export function PurchasesPanel() {
         return;
       }
 
-      const importedCount = importPurchases(result.data);
-      setDataNotice({ tone: 'success', message: `Se importaron ${importedCount} registros.` });
+      const importedCount = importPurchases(result.data.purchases, result.data.sales);
+      const importedSales = result.data.sales.length;
+      setDataNotice({
+        tone: 'success',
+        message:
+          importedSales > 0
+            ? `Se importaron ${importedCount} compras y ${importedSales} ventas.`
+            : `Se importaron ${importedCount} registros.`,
+      });
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
       setDataNotice({ tone: 'error', message: `No se pudo importar el archivo.\n${detail}` });
@@ -591,7 +622,12 @@ export function PurchasesPanel() {
         title="Compras"
         className={styles.recordsCard}
         actions={
-          <span className={styles.resultCount}>{filteredPurchases.length} resultados</span>
+          <div className={styles.recordsHeaderActions}>
+            <Button variant="secondary" onClick={() => setRegisterSaleOpen(true)}>
+              Registrar venta P2P
+            </Button>
+            <span className={styles.resultCount}>{filteredPurchases.length} resultados</span>
+          </div>
         }
       >
         {purchases.length === 0 ? (
@@ -617,9 +653,8 @@ export function PurchasesPanel() {
                   <tr>
                     <th scope="col">Banco</th>
                     <th scope="col" className={styles.numericHeader}>Inversión</th>
-                    <th scope="col" className={styles.numericHeader}>En Binance</th>
                     <th scope="col" className={styles.numericHeader}>Resultado</th>
-                    <th scope="col" className={styles.numericHeader}>Utilidad</th>
+                    <th scope="col" className={styles.numericHeader}>Ganancia</th>
                     <th scope="col">Estado</th>
                     <th scope="col" className={styles.actionsCell}>Acciones</th>
                   </tr>
@@ -628,6 +663,7 @@ export function PurchasesPanel() {
                   {pagedPurchases.map((purchase) => {
                     const outcome = getPurchaseOutcome(purchase);
                     const inventory = getInventoryData(purchase);
+                    const inventoryNote = getStatusInventoryNote(purchase, inventory);
                     const saleRate = getSaleRate(purchase);
                     const nextStatus = getNextStatuses(purchase.status).find((status) => status !== 'cancelled') ?? null;
                     return (
@@ -660,16 +696,6 @@ export function PurchasesPanel() {
                             )}
                           </span>
                         </td>
-                        <td className={styles.numericCell}>
-                          {inventory ? (
-                            <MoneyStack
-                              primary={formatUsdt(inventory.remainingUsdt)}
-                              secondary={formatBs(inventory.remainingCostVes)}
-                            />
-                          ) : (
-                            '-'
-                          )}
-                        </td>
                         <td
                           className={styles.numericCell}
                           aria-label={outcome ? undefined : 'Resultado pendiente de venta'}
@@ -686,7 +712,7 @@ export function PurchasesPanel() {
                           aria-label={
                             purchase.status === 'completed' && outcome
                               ? undefined
-                              : 'Utilidad disponible al completar la venta'
+                              : 'Ganancia disponible al completar la venta'
                           }
                         >
                           {purchase.status === 'completed' && outcome && (
@@ -697,7 +723,20 @@ export function PurchasesPanel() {
                             />
                           )}
                         </td>
-                        <td><StatusBadge status={purchase.status} /></td>
+                        <td>
+                          <div className={styles.statusCell}>
+                            <StatusBadge status={purchase.status} />
+                            {inventoryNote && inventory && (
+                              <span
+                                className={styles.statusInventory}
+                                title={`Costo restante: ${formatBs(inventory.remainingCostVes)}`}
+                                aria-label={`${inventoryNote}. Costo restante: ${formatBs(inventory.remainingCostVes)}`}
+                              >
+                                {inventoryNote}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className={styles.actionsCell}>
                           <PurchaseRowActions
                             purchaseLabel={`${purchase.profileName}, ${getPurchaseDateLabel(purchase)}`}
@@ -796,13 +835,13 @@ export function PurchasesPanel() {
                         </dd>
                       </div>
                       <div>
-                        <dt>Utilidad</dt>
+                        <dt>Ganancia</dt>
                         <dd
                           className={styles.emphasisCell}
                           aria-label={
                             purchase.status === 'completed' && outcome
                               ? undefined
-                              : 'Utilidad disponible al completar la venta'
+                              : 'Ganancia disponible al completar la venta'
                           }
                         >
                           {purchase.status === 'completed' && outcome && (
@@ -986,7 +1025,7 @@ export function PurchasesPanel() {
           />
         </div>
         <p className={styles.dataHint}>
-          Las exportaciones incluyen schemaVersion y solo contienen los resultados filtrados. Para importar CSV, usa el formato exportado por esta aplicación.
+          Las exportaciones incluyen schemaVersion y solo contienen los resultados filtrados; el JSON y el CSV incluyen también las ventas asociadas a esas compras. Para importar, usa el formato exportado por esta aplicación.
         </p>
       </Card>
       )}
@@ -1003,6 +1042,7 @@ export function PurchasesPanel() {
       <RegisterSaleModal
         open={registerSaleOpen}
         onClose={() => setRegisterSaleOpen(false)}
+        onRegistered={() => setRecordView('sales')}
       />
       <SaleDetailModal
         saleId={selectedSaleId}

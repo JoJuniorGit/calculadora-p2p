@@ -12,7 +12,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { NumberField } from '../../components/ui/NumberField';
 import { RateHistoryChart } from './RateHistoryChart';
-import { fetchBcvRate, fetchBinanceRate } from './ratesApi';
+import { fetchRateOnce } from './rateRefresh';
 import styles from './RatesPanel.module.css';
 
 type Notice = { tone: 'success' | 'error'; message: string };
@@ -153,9 +153,15 @@ export function RatesPanel() {
     setNotice(null);
 
     try {
-      const fetched = key === 'bcv' ? await fetchBcvRate() : await fetchBinanceRate();
+      const fetched = await fetchRateOnce(key);
+      const current = useAppStore.getState().rates[key];
+      if (current.source === 'manual' && current.value > 0) return;
+
       setRate(key, fetched.value, 'auto');
-      setInputValues((current) => ({ ...current, [key]: toInputNumber(fetched.value) }));
+      setInputValues((currentValues) => ({
+        ...currentValues,
+        [key]: toInputNumber(fetched.value),
+      }));
       setFieldErrors((current) => ({ ...current, [key]: undefined }));
       setNotice({ tone: 'success', message: `Actualizado desde ${fetched.provider}.` });
     } catch (error) {

@@ -349,8 +349,9 @@ export interface PurchaseFilters {
 }
 
 export interface DisclaimerConfig {
-  enabled: boolean;
   text: string;
+  /** True after the first-visit disclaimer has been shown once. */
+  hasSeen: boolean;
 }
 
 /** Slice persisted by zustand/persist. */

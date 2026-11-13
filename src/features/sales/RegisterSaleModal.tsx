@@ -15,6 +15,8 @@ import styles from './sales.module.css';
 interface RegisterSaleModalProps {
   open: boolean;
   onClose(): void;
+  /** Called after a sale is confirmed, e.g. to reveal the sales list. */
+  onRegistered?(): void;
 }
 
 interface PreviewState {
@@ -26,7 +28,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-export function RegisterSaleModal({ open, onClose }: RegisterSaleModalProps) {
+export function RegisterSaleModal({ open, onClose, onRegistered }: RegisterSaleModalProps) {
   const purchases = useAppStore((state) => state.purchases);
   const sales = useAppStore((state) => state.sales);
   const registerSale = useAppStore((state) => state.registerSale);
@@ -100,6 +102,7 @@ export function RegisterSaleModal({ open, onClose }: RegisterSaleModalProps) {
       setRateText('');
       setNotes('');
       onClose();
+      onRegistered?.();
     } catch (error) {
       setSubmitError(getErrorMessage(error, 'No fue posible registrar la venta.'));
     }

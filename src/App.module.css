@@ -125,13 +125,24 @@
 }
 
 .disclaimer {
+  display: grid;
+  gap: 0.65rem;
   padding: 0.8rem 1rem;
   border: 1px solid var(--warning);
   border-radius: var(--radius-sm);
   background: var(--warning-soft);
   color: var(--warning);
   overflow-wrap: anywhere;
+}
+
+.disclaimer p {
+  margin: 0;
   white-space: pre-wrap;
+}
+
+.disclaimerActions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .tabs {

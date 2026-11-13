@@ -54,7 +54,7 @@
 
 - [x] `npx tsc --noEmit`.
 - [x] Focused storage, store and rate-cache tests.
-- [x] Full `npm run test` (175 passed, 25 files).
+- [x] Full `npm run test` (179 passed, 25 files).
 - [x] `npm run build`.
 - [x] Desktop Chrome via CDP: app render, manifest link, service worker control.
 - [x] Desktop Chrome via CDP: offline reload served by service worker.

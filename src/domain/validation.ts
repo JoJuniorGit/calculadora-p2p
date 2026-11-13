@@ -368,8 +368,8 @@ export const purchaseFiltersSchema = z.object(
 
 export const disclaimerSchema = z.object(
   {
-    enabled: requiredBoolean,
     text: requiredText,
+    hasSeen: requiredBoolean.default(false),
   },
   objectParams,
 );
@@ -396,6 +396,7 @@ export const purchasesExportSchema = z.object(
       .min(1, { message: 'La versión del esquema debe ser mayor que 0' }),
     exportedAt: requiredText,
     purchases: z.array(purchaseRecordSchema, arrayParams),
+    sales: z.array(saleRecordSchema, arrayParams).default([]),
   },
   objectParams,
 );

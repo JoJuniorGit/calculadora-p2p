@@ -59,7 +59,7 @@ beforeEach(() => {
     profiles: [profile],
     purchases: [],
     filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
-    disclaimer: { enabled: false, text: 'Aviso de prueba.' },
+    disclaimer: { text: 'Aviso de prueba.', hasSeen: true },
     theme: 'light',
   });
   container = document.createElement('div');

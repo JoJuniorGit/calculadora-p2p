@@ -20,7 +20,7 @@ const persistedState = {
   profiles: [],
   purchases: [],
   sales: [],
-  disclaimer: { enabled: false, text: 'Aviso de prueba' },
+  disclaimer: { text: 'Aviso de prueba', hasSeen: true },
   theme: 'dark' as const,
 };
 

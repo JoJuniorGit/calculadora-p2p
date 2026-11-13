@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RateKey, Rates } from '../../domain/types';
 import { useAppStore } from '../../store/useAppStore';
-import { fetchBcvRate, fetchBinanceRate } from './ratesApi';
+import { fetchRateOnce } from './rateRefresh';
 
 export const AUTO_RATE_REFRESH_DEBOUNCE_MS = 700;
 export const AUTO_RATE_REFRESH_TTL_MS = 5 * 60 * 1000;
@@ -58,9 +58,7 @@ export function useAutoRateRefresh(triggerKey: string | null): AutoRateRefreshSt
         message: 'Actualizando tasas automáticamente…',
       });
 
-      const requests = pendingKeys.map((key) =>
-        key === 'bcv' ? fetchBcvRate() : fetchBinanceRate(),
-      );
+      const requests = pendingKeys.map((key) => fetchRateOnce(key));
 
       void Promise.allSettled(requests).then((results) => {
         if (cancelled || requestRef.current !== requestId) return;
@@ -71,6 +69,11 @@ export function useAutoRateRefresh(triggerKey: string | null): AutoRateRefreshSt
         results.forEach((result, index) => {
           const key = pendingKeys[index];
           if (result.status === 'fulfilled') {
+            const current = useAppStore.getState().rates[key];
+            if (current.source === 'manual' && current.value > 0) {
+              return;
+            }
+
             setRate(key, result.value.value, 'auto');
             updatedCount += 1;
             return;
