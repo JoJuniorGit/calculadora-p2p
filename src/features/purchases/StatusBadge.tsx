@@ -4,8 +4,10 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 
 const statusTones: Record<PurchaseStatus, BadgeTone> = {
   pending: 'warning',
+  approved: 'info',
   usd_credited: 'info',
   deposited_binance: 'info',
+  partial: 'warning',
   completed: 'success',
   cancelled: 'danger',
 };

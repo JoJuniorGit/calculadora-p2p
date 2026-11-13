@@ -10,33 +10,105 @@
   justify-content: space-between;
   gap: 1rem;
   min-width: 0;
+  padding-top: 0.5rem;
 }
 
 .pageHeader > div {
   min-width: 0;
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
 .pageHeader h2 {
-  margin-bottom: 0.25rem;
+  margin: 0;
   font-size: 1.35rem;
 }
 
-.pageHeader p {
-  margin: 0;
-  color: var(--text-muted);
-  overflow-wrap: anywhere;
-}
-
-.profileGrid {
+.profileList {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 1rem;
   min-width: 0;
 }
 
+.sortableItem {
+  position: relative;
+  min-width: 0;
+  will-change: transform;
+}
+
 .profileCard {
   min-width: 0;
+  transition:
+    box-shadow 180ms ease,
+    opacity 180ms ease;
+}
+
+.profileCard > header {
+  align-items: center;
+}
+
+.profileCardCollapsed > div {
+  display: none;
+}
+
+.profileCardDragging {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.profileCardOverlay {
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+}
+
+.dragOverlayContent {
+  width: 100%;
+}
+
+.dragHandlePreview {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--text-muted);
+}
+
+.dragHandle {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.dragHandle:hover {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }
 
 .commissionGrid {
@@ -114,15 +186,30 @@
   white-space: pre-wrap;
 }
 
+.profileActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 520px) {
+  .profileActions > button {
+    flex: 1 1 auto;
+  }
+}
+
 @media (max-width: 900px) {
   .commissionGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 720px) {
-  .profileGrid {
-    grid-template-columns: minmax(0, 1fr);
+@media (min-width: 1024px) {
+  .profileList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -138,5 +225,21 @@
 
   .pageHeader > button {
     width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .commissionGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .commissionTile {
+    padding: 0.65rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .commissionGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

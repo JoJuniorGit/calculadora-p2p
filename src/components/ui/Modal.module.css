@@ -30,12 +30,14 @@
   gap: 1rem;
   padding: 1rem 1.1rem;
   border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
 }
 
 .title {
   min-width: 0;
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.08rem;
+  letter-spacing: -0.015em;
   overflow-wrap: anywhere;
 }
 
@@ -43,8 +45,8 @@
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -61,6 +63,7 @@
 .body {
   min-width: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 1.1rem;
 }
 
@@ -85,8 +88,16 @@
 
   .dialog {
     width: 100%;
-    max-height: 94vh;
-    border-radius: var(--radius) var(--radius) 0 0;
+    max-height: calc(100dvh - 0.5rem);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .header {
+    padding: 0.9rem 0.95rem;
+  }
+
+  .body {
+    padding: 0.95rem 0.95rem calc(1.1rem + env(safe-area-inset-bottom));
   }
 }
 

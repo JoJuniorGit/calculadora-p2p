@@ -13,6 +13,28 @@ export interface NumberFieldProps {
   suffix?: string;
   action?: ReactNode;
   step?: number | 'any';
+  decimals?: number;
+}
+
+function parseNumericValue(value: string): number {
+  const normalized = value.trim().replace(',', '.');
+  return normalized === '' ? Number.NaN : Number(normalized);
+}
+
+function formatAtmDisplay(value: string, decimals: number): string {
+  const numericValue = parseNumericValue(value);
+  if (!Number.isFinite(numericValue)) return value;
+
+  return new Intl.NumberFormat('es-VE', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(numericValue);
+}
+
+function atmInputToValue(raw: string, decimals: number): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits === '') return '';
+  return (Number(digits) / 10 ** decimals).toFixed(decimals);
 }
 
 export function NumberField({
@@ -27,14 +49,16 @@ export function NumberField({
   suffix,
   action,
   step,
+  decimals = 2,
 }: NumberFieldProps) {
   const fieldId = useId();
   const hintId = `${fieldId}-hint`;
   const errorId = `${fieldId}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
-  const normalizedValue = value.trim().replace(',', '.');
-  const numericValue = normalizedValue === '' ? Number.NaN : Number(normalizedValue);
+  const numericValue = parseNumericValue(value);
+  const displayValue = value.trim() === '' ? '' : formatAtmDisplay(value, decimals);
   const stepValue = step === 'any' ? undefined : step ?? 1;
+  const decimalPlaces = Math.min(decimals, 10);
   const adornmentClassName =
     suffix && action
       ? styles.inputWithSuffixAndAction
@@ -58,10 +82,25 @@ export function NumberField({
           name={name}
           className={`${styles.input} ${styles.numberInput}`}
           type="text"
-          inputMode="decimal"
+          inputMode="numeric"
           role="spinbutton"
-          value={value}
-          onChange={(event) => onChange(event.currentTarget.value)}
+          value={displayValue}
+          onChange={(event) => {
+            const raw = event.currentTarget.value;
+            const digits = raw.replace(/\D/g, '');
+            const deleting = raw.length < displayValue.length;
+
+            if (digits === '') {
+              onChange('');
+              return;
+            }
+            if (deleting && /^0+$/.test(digits)) {
+              onChange('');
+              return;
+            }
+
+            onChange(atmInputToValue(raw, decimals));
+          }}
           onKeyDown={(event) => {
             if (stepValue === undefined || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) {
               return;
@@ -69,10 +108,9 @@ export function NumberField({
 
             const increment = event.key === 'ArrowUp' ? stepValue : -stepValue;
             const current = Number.isFinite(numericValue) ? numericValue : 0;
-            const decimalPlaces = String(stepValue).split('.')[1]?.length ?? 0;
-            const nextValue = Number((current + increment).toFixed(Math.min(decimalPlaces, 10)));
+            const nextValue = Number((current + increment).toFixed(decimalPlaces));
             event.preventDefault();
-            onChange(String(nextValue));
+            onChange(nextValue.toFixed(decimalPlaces));
           }}
           disabled={disabled}
           placeholder={placeholder}

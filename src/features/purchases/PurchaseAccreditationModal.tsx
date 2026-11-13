@@ -279,7 +279,7 @@ export function PurchaseAccreditationModal({
             )}
             {preview.profitability === 'yellow' && (
               <p className={styles.warningAlert} role="status">
-                El ROI queda por debajo del 3% saludable. Revisa el break-even
+                El ROI queda por debajo del 3% saludable. Revisa la tasa mínima
                 antes de confirmar.
               </p>
             )}

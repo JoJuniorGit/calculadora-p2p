@@ -3,18 +3,20 @@ import type { PurchaseRecord, PurchaseStatus } from '../../domain/types';
 import { getNextStatuses, PURCHASE_STATUS_LABELS } from '../../domain/purchases';
 import { useAppStore } from '../../store/useAppStore';
 import {
+  formatAmount,
   formatBs,
+  formatDate,
+  formatDateOnly,
   formatDateTime,
   formatPct,
   formatPctWithFixedUsd,
   formatRate,
   formatUsd,
-  toInputNumber,
+  toLocalDateKey,
 } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Modal } from '../../components/ui/Modal';
-import { NumberField } from '../../components/ui/NumberField';
 import { TextField } from '../../components/ui/TextField';
 import fields from '../../components/ui/fields.module.css';
 import { StatusHistoryTimeline } from '../audit/StatusHistoryTimeline';
@@ -77,6 +79,21 @@ function formatInputAmount(purchase: PurchaseRecord): string {
     : formatUsd(purchase.inputAmount);
 }
 
+function getPurchaseDateLabel(purchase: PurchaseRecord): string {
+  return purchase.purchaseDate
+    ? formatDateOnly(purchase.purchaseDate)
+    : formatDate(purchase.createdAt);
+}
+
+function getRateSourceLabel(purchase: PurchaseRecord): string {
+  if (purchase.rateReference?.source === 'historical') return 'Histórica';
+  if (purchase.rateReference?.source === 'manual') return 'Manual';
+  if (!purchase.purchaseDate) return 'Legada';
+  return toLocalDateKey(purchase.createdAt) === purchase.purchaseDate
+    ? 'En vivo'
+    : 'Histórica';
+}
+
 function formatEnabled(enabled: boolean): string {
   return enabled ? 'Activado' : 'Desactivado';
 }
@@ -87,10 +104,8 @@ function getCardBaseLabel(purchase: PurchaseRecord): string {
     : 'Cobrado extra en Bs.S';
 }
 
-function getInterbankBaseLabel(purchase: PurchaseRecord): string {
-  return purchase.snapshot.interbankBase === 'initial'
-    ? 'Sobre la inversión inicial'
-    : 'Sobre los Bs.S netos post-intervención';
+function getInterbankBaseLabel(): string {
+  return 'Sobre el monto con intervención (0,50%)';
 }
 
 function getIgtfBaseLabel(purchase: PurchaseRecord): string {
@@ -107,7 +122,6 @@ export function PurchaseDetailModal({
   const purchase = useAppStore((state) =>
     state.purchases.find((record) => record.id === purchaseId) ?? null,
   );
-  const rates = useAppStore((state) => state.rates);
   const updatePurchaseNotes = useAppStore((state) => state.updatePurchaseNotes);
   const changePurchaseStatus = useAppStore((state) => state.changePurchaseStatus);
 
@@ -115,24 +129,15 @@ export function PurchaseDetailModal({
   const [notesNotice, setNotesNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [transitionNote, setTransitionNote] = useState('');
   const [transitionError, setTransitionError] = useState<string | null>(null);
-  const [closingModalOpen, setClosingModalOpen] = useState(false);
   const [cancellationConfirmOpen, setCancellationConfirmOpen] = useState(false);
-  const [realSaleRateText, setRealSaleRateText] = useState('');
-  const [realSaleRateError, setRealSaleRateError] = useState<string | undefined>();
-  const closingModalOpenRef = useRef(closingModalOpen);
   const cancellationConfirmOpenRef = useRef(cancellationConfirmOpen);
   const onCloseRef = useRef(onClose);
   const notesId = useId();
 
-  closingModalOpenRef.current = closingModalOpen;
   cancellationConfirmOpenRef.current = cancellationConfirmOpen;
   onCloseRef.current = onClose;
 
   const handleDetailClose = useCallback(() => {
-    if (closingModalOpenRef.current) {
-      setClosingModalOpen(false);
-      return;
-    }
     if (cancellationConfirmOpenRef.current) {
       setCancellationConfirmOpen(false);
       return;
@@ -140,7 +145,6 @@ export function PurchaseDetailModal({
     onCloseRef.current();
   }, []);
 
-  const closeSaleDialog = useCallback(() => setClosingModalOpen(false), []);
   const cancelStatusConfirmation = useCallback(
     () => setCancellationConfirmOpen(false),
     [],
@@ -155,58 +159,36 @@ export function PurchaseDetailModal({
     setNotes(purchase.notes);
   }, [purchase?.id, purchase?.notes]);
 
-  const applyStatusChange = (nextStatus: PurchaseStatus, realSaleRate?: number): boolean => {
+  const applyStatusChange = (nextStatus: PurchaseStatus): boolean => {
     if (!purchase) return false;
 
     setTransitionError(null);
     try {
-      changePurchaseStatus(purchase.id, nextStatus, transitionNote, realSaleRate);
+      changePurchaseStatus(purchase.id, nextStatus, transitionNote);
       setTransitionNote('');
       setCancellationConfirmOpen(false);
-      setClosingModalOpen(false);
-      setRealSaleRateError(undefined);
       return true;
     } catch (error) {
       const message = getErrorMessage(error, 'No fue posible cambiar el estado de la compra.');
       setTransitionError(message);
-      if (nextStatus === 'completed') setRealSaleRateError(message);
       return false;
     }
   };
 
   const handleStatusAction = (nextStatus: PurchaseStatus): void => {
     setTransitionError(null);
-    setRealSaleRateError(undefined);
 
     if (nextStatus === 'cancelled') {
       setCancellationConfirmOpen(true);
       return;
     }
 
-    if (purchase && purchase.accreditationConfirmedAt === null) {
-      onRequestAccreditation(purchase.id);
-      return;
-    }
-
-    if (nextStatus === 'completed') {
-      setRealSaleRateText(rates.binance.value > 0 ? toInputNumber(rates.binance.value) : '');
-      setClosingModalOpen(true);
+    if (nextStatus === 'approved') {
+      if (purchase) onRequestAccreditation(purchase.id);
       return;
     }
 
     applyStatusChange(nextStatus);
-  };
-
-  const handleComplete = (): void => {
-    const normalizedRate = realSaleRateText.trim().replace(',', '.');
-    const realSaleRate = normalizedRate === '' ? Number.NaN : Number(normalizedRate);
-    if (!Number.isFinite(realSaleRate) || realSaleRate <= 0) {
-      setRealSaleRateError('Ingresa una tasa de venta mayor que 0.');
-      return;
-    }
-
-    setRealSaleRateError(undefined);
-    applyStatusChange('completed', realSaleRate);
   };
 
   const handleSaveNotes = (): void => {
@@ -231,6 +213,8 @@ export function PurchaseDetailModal({
   const hasAuditedSnapshot = snapshot.usdtNet !== undefined;
   const lastAuditTimestamp = getLatestAuditTimestamp(purchase);
   const summaryItems: DetailItem[] = [
+    { label: 'Fecha de compra', value: getPurchaseDateLabel(purchase) },
+    { label: 'Fuente de tasas', value: getRateSourceLabel(purchase) },
     { label: 'Invertido', value: formatBs(purchase.amountBs) },
     { label: 'Costo total', value: formatBs(purchase.totalCostBs) },
     { label: 'USD comprados', value: formatUsd(purchase.usdBought) },
@@ -317,7 +301,7 @@ export function PurchaseDetailModal({
       : []),
     {
       label: 'Interbancario',
-      value: `${formatEnabled(snapshot.interbankEnabled)} · ${formatProfilePct(snapshot.interbankPct)} · ${getInterbankBaseLabel(purchase)} · cargo ${formatBs(snapshot.interbankCostBs)}`,
+      value: `${formatEnabled(snapshot.interbankEnabled)} · ${formatProfilePct(snapshot.interbankPct)} · ${getInterbankBaseLabel()} · cargo ${formatBs(snapshot.interbankCostBs)}`,
     },
     {
       label: 'IGTF',
@@ -348,6 +332,49 @@ export function PurchaseDetailModal({
         },
       ]
     : [];
+
+  const initialInventoryUsdt =
+    purchase.initialBinanceUsdt ?? purchase.usdDeposited ?? 0;
+  const hasInventory =
+    (purchase.status === 'deposited_binance' ||
+      purchase.status === 'partial' ||
+      purchase.status === 'completed') &&
+    initialInventoryUsdt > 0;
+  const inventoryItems: DetailItem[] = hasInventory
+    ? [
+        {
+          label: 'Fondeado a Binance',
+          value: purchase.fundedToBinanceAt
+            ? formatDateTime(purchase.fundedToBinanceAt)
+            : '-',
+        },
+        { label: 'USDT iniciales', value: formatUsd(initialInventoryUsdt) },
+        {
+          label: 'Costo unitario en Binance',
+          value: `${formatRate(purchase.unitCostInBinanceVes ?? 0)} Bs.S/USDT`,
+        },
+        { label: 'USDT vendidos', value: formatUsd(purchase.soldUsdt ?? 0) },
+        { label: 'USDT restantes', value: formatUsd(purchase.remainingBinanceUsdt ?? 0) },
+        {
+          label: 'Costo asignado a ventas',
+          value: formatBs(purchase.allocatedCostVesTotal ?? 0),
+        },
+        { label: 'Costo remanente', value: formatBs(purchase.remainingCostVes ?? 0) },
+        {
+          label: 'Ingreso realizado',
+          value: formatBs(purchase.realizedRevenueVes ?? 0),
+        },
+        {
+          label: 'Ganancia realizada',
+          value: formatBs(purchase.realizedProfitVes ?? 0),
+        },
+        {
+          label: 'Tasa promedio de venta',
+          value: `${formatRate(purchase.weightedAverageSellRateVes ?? 0)} Bs.S/USDT`,
+        },
+      ]
+    : [];
+  const allocations = purchase.allocations ?? [];
 
   return (
     <>
@@ -385,6 +412,61 @@ export function PurchaseDetailModal({
             <h3 id={`${notesId}-summary`} className={styles.sectionTitle}>Resumen</h3>
             <DetailList items={summaryItems} />
           </section>
+
+          {hasInventory && (
+            <section className={styles.detailSection} aria-labelledby={`${notesId}-inventory`}>
+              <h3 id={`${notesId}-inventory`} className={styles.sectionTitle}>
+                Inventario del lote en Binance
+              </h3>
+              <DetailList items={inventoryItems} />
+            </section>
+          )}
+
+          {allocations.length > 0 && (
+            <section className={styles.detailSection} aria-labelledby={`${notesId}-allocations`}>
+              <h3 id={`${notesId}-allocations`} className={styles.sectionTitle}>
+                Trazabilidad de ventas FIFO
+              </h3>
+              <div className={styles.tableWrap}>
+                <table className={styles.allocationTable}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Fecha</th>
+                      <th scope="col" className={styles.numericHeader}>USDT</th>
+                      <th scope="col" className={styles.numericHeader}>Comisión (USDT)</th>
+                      <th scope="col" className={styles.numericHeader}>Costo (Bs.S)</th>
+                      <th scope="col" className={styles.numericHeader}>Ingreso (Bs.S)</th>
+                      <th scope="col" className={styles.numericHeader}>Ganancia (Bs.S)</th>
+                      <th scope="col" className={styles.numericHeader}>ROI</th>
+                      <th scope="col" className={styles.numericHeader}>Queda (USDT)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allocations.map((allocation) => (
+                      <tr key={allocation.allocationId}>
+                        <td>{formatDateTime(allocation.allocatedAt)}</td>
+                        <td className={styles.numericCell}>{formatAmount(allocation.usdtTaken)}</td>
+                        <td className={styles.numericCell}>{formatAmount(allocation.p2pFeeShareUsdt)}</td>
+                        <td className={styles.numericCell}>{formatAmount(allocation.allocatedCostVes)}</td>
+                        <td className={styles.numericCell}>{formatAmount(allocation.allocatedRevenueVes)}</td>
+                        <td
+                          className={`${styles.numericCell} ${
+                            allocation.allocatedProfitVes < 0
+                              ? styles.negativeValue
+                              : styles.positiveValue
+                          }`}
+                        >
+                          {formatAmount(allocation.allocatedProfitVes)}
+                        </td>
+                        <td className={styles.numericCell}>{formatPct(allocation.allocatedRoiPercent)}</td>
+                        <td className={styles.numericCell}>{formatAmount(allocation.lotRemainingUsdtAfter)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           {showAccreditation && (
             <section className={styles.detailSection} aria-labelledby={`${notesId}-accreditation`}>
@@ -440,7 +522,7 @@ export function PurchaseDetailModal({
 
           <section className={styles.detailSection} aria-labelledby={`${notesId}-audit`}>
             <h3 id={`${notesId}-audit`} className={styles.sectionTitle}>Estado y auditoría</h3>
-            {transitionError && !closingModalOpen && (
+            {transitionError && (
               <p className={styles.errorNotice} role="alert">{transitionError}</p>
             )}
             {nextStatuses.length > 0 ? (
@@ -474,49 +556,6 @@ export function PurchaseDetailModal({
             </div>
           </section>
         </div>
-      </Modal>
-
-      <Modal open={closingModalOpen} title="Cerrar operación" onClose={closeSaleDialog}>
-        <form
-          className={styles.closeForm}
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            handleComplete();
-          }}
-        >
-          <p className={styles.mutedText}>
-            Registra la tasa real de venta en Binance para calcular el resultado ejecutado.
-          </p>
-          {transitionError && <p className={styles.errorNotice} role="alert">{transitionError}</p>}
-          <NumberField
-            label="Tasa Binance real de venta"
-            value={realSaleRateText}
-            onChange={(value) => {
-              setRealSaleRateText(value);
-              setRealSaleRateError(undefined);
-              setTransitionError(null);
-            }}
-            error={realSaleRateError}
-            suffix="Bs.S/USD"
-            step="any"
-            placeholder="Ej.: 42,50"
-          />
-          <TextField
-            label="Nota del cambio de estado (opcional)"
-            value={transitionNote}
-            onChange={(value) => {
-              setTransitionNote(value);
-              setTransitionError(null);
-            }}
-          />
-          <div className={styles.modalActions}>
-            <Button variant="secondary" onClick={closeSaleDialog}>
-              Volver
-            </Button>
-            <Button type="submit">Confirmar cierre</Button>
-          </div>
-        </form>
       </Modal>
 
       <ConfirmDialog

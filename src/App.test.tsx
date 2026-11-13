@@ -53,6 +53,12 @@ describe('client render smoke', () => {
     });
 
     expect(container.textContent).toContain('Calculadora P2P');
+    const nav = container.querySelector('nav[aria-label="Navegación principal"]');
+    expect(nav).not.toBeNull();
+    expect(nav?.querySelectorAll('button')).toHaveLength(4);
+    expect(container.querySelector('aside[aria-label="Menú lateral"]')).toBeNull();
+    expect(container.querySelector('button[aria-controls="app-sidebar"]')).toBeNull();
+
     expect(container.querySelector('[aria-current="page"]')?.textContent?.trim()).toBe(
       'Calculadora',
     );
@@ -64,7 +70,24 @@ describe('client render smoke', () => {
 
     clickButton('Registros');
     expect(container.textContent).toContain('Capital en tránsito');
+    expect(container.textContent).toContain('Compras');
+    expect(container.textContent).toContain('Ventas');
     expect(container.textContent).toContain('Todavía no hay compras registradas');
     expect(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)).toBe('records');
+  });
+
+  it('renders storage diagnostics in the rates tab', async () => {
+    act(() => {
+      root?.render(<App />);
+    });
+
+    clickButton('Tasas');
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain('Almacenamiento y respaldo');
+    expect(container.textContent).toContain('Solicitar almacenamiento persistente');
   });
 });

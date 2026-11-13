@@ -1,0 +1,58 @@
+.shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: calc(1rem + env(safe-area-inset-top))
+    calc(1rem + env(safe-area-inset-right))
+    calc(1rem + env(safe-area-inset-bottom))
+    calc(1rem + env(safe-area-inset-left));
+  background: var(--bg);
+  color: var(--text);
+}
+
+.card {
+  display: grid;
+  gap: 0.85rem;
+  width: min(100%, 34rem);
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.mark {
+  width: fit-content;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.card h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  padding-top: 0.2rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+}

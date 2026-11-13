@@ -7,6 +7,7 @@ import type {
   IgtfBase,
 } from '../../domain/types';
 import { bankProfileDraftSchema, formatZodIssues } from '../../domain/validation';
+import { DEFAULT_P2P_FIXED_FEE_USDT } from '../../domain/calculations';
 import { toInputNumber } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
 import { NumberField } from '../../components/ui/NumberField';
@@ -56,10 +57,14 @@ function createInitialValues(profile?: BankProfile | null): ProfileFormValues {
     cardCommissionPct: profile ? toInputNumber(profile.cardCommissionPct) : '0',
     cardCommissionBase: profile?.cardCommissionBase ?? 'usd',
     binanceDepositPct: profile ? toInputNumber(profile.binanceDepositPct) : '0',
-    binanceDepositFixedUsd: profile ? toInputNumber(profile.binanceDepositFixedUsd) : '0',
+    binanceDepositFixedUsd: profile
+      ? toInputNumber(
+          Math.max(profile.binanceDepositFixedUsd, DEFAULT_P2P_FIXED_FEE_USDT),
+        )
+      : toInputNumber(DEFAULT_P2P_FIXED_FEE_USDT),
     interbankEnabled: profile?.interbankEnabled ?? false,
     interbankPct: profile ? toInputNumber(profile.interbankPct) : '0.30',
-    interbankBase: profile?.interbankBase ?? 'initial',
+    interbankBase: 'net',
     igtfEnabled: profile?.igtfEnabled ?? false,
     igtfPct: profile ? toInputNumber(profile.igtfPct) : '3',
     igtfBase: profile?.igtfBase ?? 'card',
@@ -207,13 +212,14 @@ export function BankProfileForm({ profile, onSave, onCancel }: BankProfileFormPr
             step={0.01}
           />
           <NumberField
-            label="Monto fijo (USD)"
+            label="Monto fijo por venta P2P"
             name="binanceDepositFixedUsd"
             value={values.binanceDepositFixedUsd}
             onChange={(value) => updateValue('binanceDepositFixedUsd', value)}
             error={fieldErrors.binanceDepositFixedUsd}
-            suffix="USD"
+            suffix="USDT"
             step={0.01}
+            hint="Mínimo aplicado por el motor: 0,06 USDT por venta."
           />
         </div>
       </fieldset>
@@ -237,18 +243,7 @@ export function BankProfileForm({ profile, onSave, onCancel }: BankProfileFormPr
               suffix="%"
               step={0.01}
               disabled={!values.interbankEnabled}
-            />
-            <SelectField
-              label="Base interbancaria"
-              name="interbankBase"
-              value={values.interbankBase}
-              onChange={(value) => updateValue('interbankBase', value as InterbankBase)}
-              options={[
-                { value: 'initial', label: 'Sobre la inversión inicial' },
-                { value: 'net', label: 'Sobre los Bs.S netos post-intervención' },
-              ]}
-              error={fieldErrors.interbankBase}
-              disabled={!values.interbankEnabled}
+              hint="Se aplica sobre el monto con la intervención del 0,50% ya sumada."
             />
           </div>
         </div>

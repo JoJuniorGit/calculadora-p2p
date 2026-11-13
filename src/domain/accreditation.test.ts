@@ -109,7 +109,7 @@ describe('recalculateAccreditation', () => {
     expect(result.waterfall).toEqual(initial.waterfall);
   });
 
-  it('scales a proportional partial accreditation and preserves ROI without fixed costs', () => {
+  it('scales a proportional partial accreditation while keeping the mandatory fixed P2P fee', () => {
     const { purchase, initial } = createPurchaseFixture(
       createInput({ profile: createProfile({ binanceDepositFixedUsd: 0 }) }),
     );
@@ -131,8 +131,10 @@ describe('recalculateAccreditation', () => {
     );
     expect(result.amountBs).toBeCloseTo(purchase.requestedInvestmentVes / 2, 0);
     expect(result.usdDeposited).toBeCloseTo(initial.usdDeposited / 2, 0);
-    expect(result.roiPct).toBeCloseTo(initial.roiPct, 2);
-    expect(result.breakEvenRate).toBeCloseTo(initial.breakEvenRate, 2);
+    expect(result.binanceFixedFeeUsd).toBe(0.06);
+    expect(result.roiPct).toBeLessThan(initial.roiPct);
+    expect(result.roiPct).toBeCloseTo(initial.roiPct, 1);
+    expect(result.breakEvenRate).toBeCloseTo(initial.breakEvenRate, 1);
   });
 
   it('lowers ROI and raises break-even when fixed USD or sunk interbank costs remain', () => {

@@ -199,3 +199,38 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+@media (max-width: 720px) {
+  .panel {
+    gap: 0.8rem;
+  }
+
+  .rateCardContent {
+    gap: 0.8rem;
+  }
+
+  .gapContent {
+    gap: 0.75rem;
+  }
+
+  .heroValue {
+    font-size: clamp(2.2rem, 10vw, 3rem);
+  }
+
+  .secondaryMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    padding-top: 0.7rem;
+  }
+
+  .gapHint,
+  .footerNote {
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .secondaryMetrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

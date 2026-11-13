@@ -1,0 +1,358 @@
+.content {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.salesCard {
+  min-width: 0;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.summaryItem {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.summaryLabel,
+.previewLabel {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+}
+
+.summaryValue,
+.previewValue {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.previewCard {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.positiveValue {
+  color: var(--success);
+}
+
+.negativeValue {
+  color: var(--danger);
+}
+
+.dangerAlert {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.tableWrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.allocationsTable {
+  width: 100%;
+  min-width: 760px;
+  font-size: 0.82rem;
+}
+
+.allocationsTable th,
+.allocationsTable td {
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.allocationsTable th {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.allocationsTable th.numericHeader {
+  text-align: right;
+}
+
+.allocationsTable td.numericCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.allocationsTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.section {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: 0.55rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.detailItem {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.detailItem dt {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+}
+
+.detailItem dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.salesCardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.salesTable {
+  min-width: 980px;
+  font-size: 0.82rem;
+}
+
+.salesTable th,
+.salesTable td {
+  padding: 0.68rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.salesTable th {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.77rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.salesTable th.numericHeader,
+.salesTable td.numericCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.salesTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.saleActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.emptySales {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .fieldGrid,
+  .previewGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .summaryRow,
+  .fieldGrid,
+  .previewGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions > button {
+    flex: 1 1 130px;
+  }
+}
+
+.salesTableWrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.mobileSalesList {
+  display: none;
+}
+
+.mobileSaleCard {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-summary);
+}
+
+.mobileSaleCard + .mobileSaleCard {
+  margin-top: 0.65rem;
+}
+
+.mobileSaleHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.mobileSaleHeader h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.mobileSaleHeader time {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.mobileSaleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.8rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.mobileSaleGrid > div {
+  display: grid;
+  align-content: start;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.mobileSaleGrid dt {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.mobileSaleGrid dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.87rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 620;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.mobileSaleActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .salesTableWrap {
+    display: none;
+  }
+
+  .mobileSalesList {
+    display: block;
+  }
+}
+
+@media (max-width: 360px) {
+  .mobileSaleGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

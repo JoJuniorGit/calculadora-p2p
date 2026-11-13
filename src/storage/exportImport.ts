@@ -53,7 +53,17 @@ const purchaseCsvColumns = [
   ...accreditationCsvColumns,
 ] as const;
 
-type PurchaseCsvColumn = (typeof purchaseCsvColumns)[number];
+const historicalCsvColumns = [
+  'purchaseDate',
+  'rateReference',
+] as const;
+
+const currentPurchaseCsvColumns = [
+  ...purchaseCsvColumns,
+  ...historicalCsvColumns,
+] as const;
+
+type PurchaseCsvColumn = (typeof currentPurchaseCsvColumns)[number];
 
 interface CsvRow {
   fields: string[];
@@ -293,6 +303,17 @@ function parseCsvPurchase(
       values.accreditationConfirmedAt === '' ? null : values.accreditationConfirmedAt;
   }
 
+  if (values.purchaseDate !== undefined && values.purchaseDate.trim() !== '') {
+    candidate.purchaseDate = values.purchaseDate;
+  }
+  if (values.rateReference !== undefined && values.rateReference.trim() !== '') {
+    candidate.rateReference = parseJsonColumn(
+      values.rateReference,
+      'rateReference',
+      rowLine,
+    );
+  }
+
   return candidate;
 }
 
@@ -323,7 +344,7 @@ export function parsePurchasesJson(text: string): ImportResult<PurchaseRecord[]>
 }
 
 export function createPurchasesCsvExport(purchases: PurchaseRecord[]): string {
-  const header = purchaseCsvColumns.join(',');
+  const header = currentPurchaseCsvColumns.join(',');
   const rows = purchases.map((purchase) => {
     const values: Record<PurchaseCsvColumn, string> = {
       id: purchase.id,
@@ -356,9 +377,13 @@ export function createPurchasesCsvExport(purchases: PurchaseRecord[]): string {
       executedInvestmentVes: String(purchase.executedInvestmentVes),
       refundedVes: String(purchase.refundedVes),
       accreditationConfirmedAt: purchase.accreditationConfirmedAt ?? '',
+      purchaseDate: purchase.purchaseDate ?? '',
+      rateReference: purchase.rateReference
+        ? JSON.stringify(purchase.rateReference)
+        : '',
     };
 
-    return purchaseCsvColumns.map((column) => escapeCsvField(values[column])).join(',');
+    return currentPurchaseCsvColumns.map((column) => escapeCsvField(values[column])).join(',');
   });
 
   return ['# schemaVersion=1', header, ...rows].join('\r\n');
@@ -381,11 +406,18 @@ export function parsePurchasesCsv(text: string): ImportResult<PurchaseRecord[]> 
   const hasCurrentHeader =
     header.fields.length === purchaseCsvColumns.length &&
     purchaseCsvColumns.every((column, index) => header.fields[index] === column);
-  if (!hasLegacyHeader && !hasCurrentHeader) {
+  const hasHistoricalHeader =
+    header.fields.length === currentPurchaseCsvColumns.length &&
+    currentPurchaseCsvColumns.every((column, index) => header.fields[index] === column);
+  if (!hasLegacyHeader && !hasCurrentHeader && !hasHistoricalHeader) {
     return { ok: false, errors: [`Fila ${header.line}: el encabezado CSV no es válido.`] };
   }
 
-  const columns = hasCurrentHeader ? purchaseCsvColumns : legacyPurchaseCsvColumns;
+  const columns = hasHistoricalHeader
+    ? currentPurchaseCsvColumns
+    : hasCurrentHeader
+      ? purchaseCsvColumns
+      : legacyPurchaseCsvColumns;
   const purchases: PurchaseRecord[] = [];
   const errors: string[] = [];
 

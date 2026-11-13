@@ -9,7 +9,6 @@ import type {
   PersistedState,
   PurchaseRecord,
 } from '../domain/types';
-import { formatRate } from '../utils/format';
 import { SCHEMA_VERSION, useAppStore } from './useAppStore';
 
 const timestamp = '2024-01-02T03:04:05.000Z';
@@ -104,12 +103,70 @@ function resetStore(): void {
     },
     profiles: [],
     purchases: [],
+    sales: [],
     filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
     disclaimer: defaultDisclaimer,
     theme: 'light',
   });
   localStorage.clear();
 }
+
+describe('useAppStore profile order', () => {
+  beforeEach(resetStore);
+
+  it('moves a profile by id without mutating the previous array', () => {
+    const first = createProfile({ id: 'profile-1', name: 'Banco Uno' });
+    const second = createProfile({ id: 'profile-2', name: 'Banco Dos' });
+    const third = createProfile({ id: 'profile-3', name: 'Banco Tres' });
+    useAppStore.setState({ profiles: [first, second, third] });
+    const previous = useAppStore.getState().profiles;
+
+    useAppStore.getState().moveProfile(third.id, first.id);
+
+    expect(useAppStore.getState().profiles.map((profile) => profile.id)).toEqual([
+      'profile-3',
+      'profile-1',
+      'profile-2',
+    ]);
+    expect(useAppStore.getState().profiles).not.toBe(previous);
+    expect(previous.map((profile) => profile.id)).toEqual([
+      'profile-1',
+      'profile-2',
+      'profile-3',
+    ]);
+  });
+
+  it('ignores identical or unknown profile ids', () => {
+    const first = createProfile({ id: 'profile-1', name: 'Banco Uno' });
+    const second = createProfile({ id: 'profile-2', name: 'Banco Dos' });
+    useAppStore.setState({ profiles: [first, second] });
+    const previous = useAppStore.getState().profiles;
+
+    useAppStore.getState().moveProfile(first.id, first.id);
+    useAppStore.getState().moveProfile('missing-profile', second.id);
+    useAppStore.getState().moveProfile(first.id, 'missing-profile');
+
+    expect(useAppStore.getState().profiles).toBe(previous);
+  });
+
+  it('persists the reordered profile ids', () => {
+    const first = createProfile({ id: 'profile-1', name: 'Banco Uno' });
+    const second = createProfile({ id: 'profile-2', name: 'Banco Dos' });
+    const third = createProfile({ id: 'profile-3', name: 'Banco Tres' });
+    useAppStore.setState({ profiles: [first, second, third] });
+
+    useAppStore.getState().moveProfile(third.id, first.id);
+
+    const persisted = JSON.parse(
+      localStorage.getItem('calculadora-p2p') ?? '{}',
+    ) as { state?: { profiles?: Array<{ id: string }> } };
+    expect(persisted.state?.profiles?.map((profile) => profile.id)).toEqual([
+      'profile-3',
+      'profile-1',
+      'profile-2',
+    ]);
+  });
+});
 
 describe('useAppStore purchase actions', () => {
   beforeEach(resetStore);
@@ -144,37 +201,88 @@ describe('useAppStore purchase actions', () => {
     expect(useAppStore.getState().purchases).toEqual([record]);
   });
 
+  it('persists the purchase date and rate reference from the registration metadata without changing live rates', () => {
+    const input = createInput();
+    const rateReference = {
+      source: 'historical' as const,
+      bcvAsOf: '2024-01-01T00:00:00.000Z',
+      bcvForwardFilled: false,
+      binanceAsOf: '2024-01-01T12:00:00.000Z',
+      binanceMethod: 'median' as const,
+    };
+    useAppStore.getState().setRate('bcv', 50, 'manual');
+    useAppStore.getState().setRate('binance', 60, 'auto');
+    const liveRatesBefore = useAppStore.getState().rates;
+
+    const record = useAppStore.getState().recordPurchase(input, 'Compra histórica', {
+      purchaseDate: '2024-01-01',
+      rateReference,
+    });
+
+    expect(record).toMatchObject({
+      purchaseDate: '2024-01-01',
+      rateReference,
+      bcvRate: input.bcvRate,
+      binanceRate: input.binanceRate,
+      snapshot: {
+        bcvRate: input.bcvRate,
+        binanceRate: input.binanceRate,
+      },
+    });
+    expect(useAppStore.getState().rates).toEqual(liveRatesBefore);
+  });
+
   it('allows the next status and rejects a skipped transition', () => {
     const record = useAppStore.getState().recordPurchase(createInput());
 
     expect(() =>
       useAppStore.getState().changePurchaseStatus(record.id, 'completed', '', 46.5),
+    ).toThrow('El inventario se actualiza registrando ventas P2P');
+    expect(() =>
+      useAppStore.getState().changePurchaseStatus(record.id, 'usd_credited'),
     ).toThrow('Transición de estado no permitida');
+    expect(() =>
+      useAppStore.getState().changePurchaseStatus(record.id, 'approved'),
+    ).toThrow('Usa el registro de acreditación para aprobar la compra');
 
+    useAppStore.getState().accreditPurchase(record.id, {
+      accreditationType: 'TOTAL',
+      accreditedUsd: record.requestedUsd,
+      keepInterbankSunk: true,
+    });
     useAppStore.getState().changePurchaseStatus(record.id, 'usd_credited', '  Acreditado  ');
 
     expect(useAppStore.getState().purchases[0]).toMatchObject({ status: 'usd_credited' });
-    expect(useAppStore.getState().purchases[0].statusHistory[1].note).toBe('Acreditado');
+    expect(useAppStore.getState().purchases[0].statusHistory[2].note).toBe('Acreditado');
   });
 
-  it('stores execution and a formatted default note when a deposited purchase is completed', () => {
+  it('funds a lot in Binance and rejects manual inventory statuses', () => {
     const record = useAppStore.getState().recordPurchase(createInput());
-    const store = useAppStore.getState();
-    store.changePurchaseStatus(record.id, 'usd_credited');
-    useAppStore.getState().changePurchaseStatus(record.id, 'deposited_binance');
-    useAppStore.getState().changePurchaseStatus(record.id, 'completed', '   ', 46.5);
-
-    const completed = useAppStore.getState().purchases[0];
-
-    expect(completed.status).toBe('completed');
-    expect(completed.execution).toMatchObject({ realBinanceRate: 46.5 });
-    expect(completed.execution?.closedAt).toBeTruthy();
-    expect(completed.statusHistory).toHaveLength(4);
-    expect(completed.statusHistory[3]).toMatchObject({
-      fromStatus: 'deposited_binance',
-      toStatus: 'completed',
-      note: `Venta real a ${formatRate(46.5)} Bs.S/USD`,
+    useAppStore.getState().accreditPurchase(record.id, {
+      accreditationType: 'TOTAL',
+      accreditedUsd: record.requestedUsd,
+      keepInterbankSunk: true,
     });
+    useAppStore.getState().changePurchaseStatus(record.id, 'usd_credited');
+    useAppStore.getState().changePurchaseStatus(record.id, 'deposited_binance');
+
+    const funded = useAppStore.getState().purchases[0];
+    expect(funded.status).toBe('deposited_binance');
+    expect(funded.fundedToBinanceAt).toBeTruthy();
+    expect(funded.initialBinanceUsdt).toBe(funded.usdDeposited);
+    expect(funded.remainingBinanceUsdt).toBe(funded.usdDeposited);
+    expect(funded.remainingCostVes).toBe(funded.executedInvestmentVes);
+    expect(funded.unitCostInBinanceVes).toBe(
+      round2(funded.executedInvestmentVes / funded.usdDeposited),
+    );
+    expect(funded.allocations).toEqual([]);
+
+    expect(() =>
+      useAppStore.getState().changePurchaseStatus(record.id, 'completed'),
+    ).toThrow('El inventario se actualiza registrando ventas P2P');
+    expect(() =>
+      useAppStore.getState().changePurchaseStatus(record.id, 'partial'),
+    ).toThrow('El inventario se actualiza registrando ventas P2P');
   });
 
   it('accredits a pending purchase partially while preserving the original request', () => {
@@ -187,7 +295,7 @@ describe('useAppStore purchase actions', () => {
       note: 'Corte de mesa de cambio',
     });
 
-    expect(updated.status).toBe('usd_credited');
+    expect(updated.status).toBe('approved');
     expect(updated.requestedInvestmentVes).toBe(record.requestedInvestmentVes);
     expect(updated.requestedUsd).toBe(record.requestedUsd);
     expect(updated.accreditationType).toBe('PARTIAL');
@@ -205,9 +313,10 @@ describe('useAppStore purchase actions', () => {
       keepInterbankSunk: false,
       accreditedUsd: half,
     });
-    expect(computeKpis(useAppStore.getState().purchases).inTransitCapitalBs).toBe(
+    expect(computeKpis(useAppStore.getState().purchases).capitalInTransitVes).toBe(
       updated.totalCostBs,
     );
+    expect(computeKpis(useAppStore.getState().purchases).capitalInBankVes).toBe(0);
   });
 
   it('keeps the original values when the accreditation is total', () => {
@@ -254,21 +363,89 @@ describe('useAppStore purchase actions', () => {
     );
   });
 
-  it('rejects an unknown purchase and completion without a valid sale rate', () => {
+  it('rejects an unknown purchase and any manual inventory completion', () => {
     expect(() =>
       useAppStore.getState().changePurchaseStatus('missing', 'usd_credited'),
     ).toThrow('Compra no encontrada');
 
     const record = useAppStore.getState().recordPurchase(createInput());
+    useAppStore.getState().accreditPurchase(record.id, {
+      accreditationType: 'TOTAL',
+      accreditedUsd: record.requestedUsd,
+      keepInterbankSunk: true,
+    });
     useAppStore.getState().changePurchaseStatus(record.id, 'usd_credited');
     useAppStore.getState().changePurchaseStatus(record.id, 'deposited_binance');
 
     expect(() =>
       useAppStore.getState().changePurchaseStatus(record.id, 'completed'),
-    ).toThrow('La tasa real de venta es obligatoria');
+    ).toThrow('El inventario se actualiza registrando ventas P2P');
     expect(() =>
-      useAppStore.getState().changePurchaseStatus(record.id, 'completed', '', 0),
-    ).toThrow('La tasa real de venta debe ser mayor que 0');
+      useAppStore.getState().changePurchaseStatus(record.id, 'partial'),
+    ).toThrow('El inventario se actualiza registrando ventas P2P');
+  });
+
+  it('registers a FIFO sale, blocks deleting consumed purchases, and restores lots on sale deletion', () => {
+    const record = useAppStore.getState().recordPurchase(createInput());
+    useAppStore.getState().accreditPurchase(record.id, {
+      accreditationType: 'TOTAL',
+      accreditedUsd: record.requestedUsd,
+      keepInterbankSunk: true,
+    });
+    useAppStore.getState().changePurchaseStatus(record.id, 'usd_credited');
+    useAppStore.getState().changePurchaseStatus(record.id, 'deposited_binance');
+
+    const funded = useAppStore.getState().purchases[0];
+    const sale = useAppStore.getState().registerSale({
+      totalUsdtSold: 100,
+      sellRateVes: 1_080,
+    });
+    const afterSale = useAppStore.getState().purchases[0];
+
+    expect(sale.totalUsdtSold).toBe(100);
+    expect(sale.p2pFixedFeeUsdt).toBe(0.06);
+    expect(sale.totalVesReceived).toBeCloseTo(107_935.2, 2);
+    expect(sale.allocations).toHaveLength(1);
+    expect(sale.allocations[0].purchaseId).toBe(record.id);
+    expect(afterSale.status).toBe('partial');
+    expect(afterSale.remainingBinanceUsdt).toBe(
+      round2((funded.remainingBinanceUsdt ?? 0) - 100),
+    );
+    expect(afterSale.soldUsdt).toBe(100);
+
+    expect(() => useAppStore.getState().deletePurchase(record.id)).toThrow(
+      'No se puede eliminar una compra consumida por ventas',
+    );
+
+    useAppStore.getState().deleteSale(sale.id);
+    const restored = useAppStore.getState().purchases[0];
+    expect(restored.status).toBe('deposited_binance');
+    expect(restored.remainingBinanceUsdt).toBe(funded.initialBinanceUsdt);
+    expect(restored.remainingCostVes).toBe(funded.executedTotalCostVes);
+    expect(restored.allocations).toEqual([]);
+    expect(useAppStore.getState().sales).toEqual([]);
+
+    useAppStore.getState().deletePurchase(record.id);
+    expect(useAppStore.getState().purchases).toEqual([]);
+  });
+
+  it('rejects a sale larger than the funded Binance inventory', () => {
+    const record = useAppStore.getState().recordPurchase(createInput());
+    useAppStore.getState().accreditPurchase(record.id, {
+      accreditationType: 'TOTAL',
+      accreditedUsd: record.requestedUsd,
+      keepInterbankSunk: true,
+    });
+    useAppStore.getState().changePurchaseStatus(record.id, 'usd_credited');
+    useAppStore.getState().changePurchaseStatus(record.id, 'deposited_binance');
+
+    expect(() =>
+      useAppStore.getState().registerSale({
+        totalUsdtSold: record.usdDeposited + 1,
+        sellRateVes: 1_080,
+      }),
+    ).toThrow(/Saldo insuficiente/);
+    expect(useAppStore.getState().sales).toEqual([]);
   });
 });
 
@@ -304,6 +481,7 @@ describe('useAppStore imports', () => {
       },
       profiles: [profile],
       purchases: [purchase],
+      sales: [],
       disclaimer: { enabled: true, text: 'Aviso importado para pruebas.' },
       theme: 'dark',
     };
@@ -316,6 +494,7 @@ describe('useAppStore imports', () => {
       rates: config.rates,
       profiles: config.profiles,
       purchases: config.purchases,
+      sales: config.sales,
       disclaimer: config.disclaimer,
       theme: 'dark',
       filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },

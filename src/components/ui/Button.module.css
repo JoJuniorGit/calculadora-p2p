@@ -5,17 +5,17 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  min-height: 40px;
+  min-height: 44px;
   max-width: 100%;
-  padding: 0.55rem 0.9rem;
+  padding: 0.6rem 1rem;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-weight: 620;
+  font-weight: 650;
   line-height: 1.25;
   text-align: center;
   overflow-wrap: anywhere;
   overflow: hidden;
-  box-shadow: var(--shadow);
+  box-shadow: none;
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -30,38 +30,30 @@
 
 .button:disabled {
   cursor: not-allowed;
-  opacity: 0.58;
+  opacity: 0.56;
 }
 
 .primary {
   border-color: var(--primary);
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  background: var(--primary);
   color: var(--primary-contrast);
-}
-
-.primary::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: linear-gradient(180deg, var(--surface-highlight), transparent 70%);
-  content: '';
-  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 7px 16px -12px var(--primary);
 }
 
 .primary:hover:not(:disabled) {
-  box-shadow: var(--shadow-lg), 0 0 0 3px var(--primary-glow);
+  background: var(--primary-hover);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.16), 0 9px 20px -12px var(--primary);
 }
 
 .secondary {
   border-color: var(--border);
-  background: var(--surface-gradient);
+  background: var(--bg-elevated);
   color: var(--text);
 }
 
 .secondary:hover:not(:disabled) {
   border-color: var(--border-strong);
-  background: var(--bg-hover);
-  box-shadow: var(--shadow-lg);
+  background: var(--bg-subtle);
 }
 
 .ghost {

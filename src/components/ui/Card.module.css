@@ -3,8 +3,8 @@
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface-gradient);
-  box-shadow: var(--shadow);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
 }
 
 .header {
@@ -12,15 +12,23 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.85rem;
-  padding: 1.1rem 1.2rem 0.85rem;
+  padding: 1rem 1.1rem 0.8rem;
   border-bottom: 1px solid var(--border);
+  background: var(--card-header-surface);
+}
+
+.leading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
 }
 
 .title {
+  flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 1.02rem;
-  font-weight: 650;
+  font-size: 1rem;
+  font-weight: 660;
   letter-spacing: -0.015em;
   overflow-wrap: anywhere;
 }
@@ -35,14 +43,13 @@
 
 .body {
   min-width: 0;
-  padding: 1.05rem 1.2rem 1.2rem;
+  padding: 1rem 1.1rem 1.1rem;
 }
 
 @media (max-width: 520px) {
   .header {
     flex-wrap: wrap;
-    padding-right: 1rem;
-    padding-left: 1rem;
+    padding: 0.85rem 0.85rem 0.7rem;
   }
 
   .actions {
@@ -50,7 +57,6 @@
   }
 
   .body {
-    padding-right: 1rem;
-    padding-left: 1rem;
+    padding: 0.85rem;
   }
 }

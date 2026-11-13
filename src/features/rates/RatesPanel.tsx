@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { NumberField } from '../../components/ui/NumberField';
+import { RateHistoryChart } from './RateHistoryChart';
 import { fetchBcvRate, fetchBinanceRate } from './ratesApi';
 import styles from './RatesPanel.module.css';
 
@@ -63,6 +64,7 @@ function RateCard({
           onChange={onValueChange}
           suffix="Bs.S"
           step={0.01}
+          decimals={4}
           error={error}
           placeholder="Ej.: 36,50"
           action={
@@ -256,6 +258,8 @@ export function RatesPanel() {
           </p>
         )}
       </Card>
+
+      <RateHistoryChart />
 
       <p className={styles.footerNote}>
         La comisión por intervención es fija: 0,50% y no se puede editar.

@@ -135,13 +135,23 @@ export function PurchaseRowActions({
   };
 
   const advanceTitle = nextStatus
-    ? nextStatus === 'completed'
-      ? `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]}. Abre el detalle para registrar la tasa real de venta antes de completar la operación.`
-      : `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]}`
+    ? nextStatus === 'approved'
+      ? 'Registrar la acreditación bancaria de esta compra'
+      : nextStatus === 'usd_credited'
+        ? `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]} (USD acreditados por el banco)`
+        : nextStatus === 'deposited_binance'
+          ? `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]} (fondos depositados)`
+          : `Avanzar a ${PURCHASE_STATUS_LABELS[nextStatus]}`
     : undefined;
 
-  const isLiquidation = nextStatus === 'completed';
-  const quickActionLabel = isLiquidation ? 'Liquidar operación' : 'Avanzar estado';
+  const quickActionLabel =
+    nextStatus === 'approved'
+      ? 'Registrar acreditación'
+      : nextStatus === 'usd_credited'
+        ? 'Marcar acreditado'
+        : nextStatus === 'deposited_binance'
+          ? 'Marcar en Binance'
+          : 'Avanzar estado';
 
   const handleQuickAction = (): void => {
     if (open) onOpenChangeRef.current(false);
@@ -176,7 +186,7 @@ export function PurchaseRowActions({
                 title={advanceTitle}
                 onClick={() => selectAction(onAdvance)}
               >
-                Avanzar estado
+                {quickActionLabel}
               </button>
             )}
             <div className={styles.separator} role="separator" />
@@ -202,39 +212,23 @@ export function PurchaseRowActions({
             type="button"
             title={quickActionLabel}
             aria-label={`${quickActionLabel} para ${purchaseLabel}`}
-            data-kind={isLiquidation ? 'complete' : 'advance'}
+            data-kind="advance"
             onClick={handleQuickAction}
           >
-            {isLiquidation ? (
-              <svg
-                className={styles.icon}
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path d="M3.5 8.5l3 3 6-6" />
-              </svg>
-            ) : (
-              <svg
-                className={styles.icon}
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path d="M3 8h9" />
-                <path d="M8.5 4.5L12 8l-3.5 3.5" />
-              </svg>
-            )}
+            <svg
+              className={styles.icon}
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3 8h9" />
+              <path d="M8.5 4.5L12 8l-3.5 3.5" />
+            </svg>
           </button>
         )}
         <button

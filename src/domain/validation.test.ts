@@ -102,6 +102,7 @@ const persistedState: PersistedState = {
   },
   profiles: [profile],
   purchases: [purchase],
+  sales: [],
   disclaimer: { enabled: false, text: '' },
   theme: 'light',
 };
@@ -133,6 +134,39 @@ describe('purchase and persisted-state schemas', () => {
   it('accepts valid purchase and persisted state fixtures', () => {
     expect(purchaseRecordSchema.safeParse(purchase).success).toBe(true);
     expect(persistedStateSchema.safeParse(persistedState).success).toBe(true);
+  });
+
+  it('accepts optional purchase dates and rate-reference metadata while keeping legacy records valid', () => {
+    const rateReference = {
+      source: 'historical' as const,
+      bcvAsOf: '2024-01-02T00:00:00.000Z',
+      bcvForwardFilled: true,
+      binanceAsOf: '2024-01-02T12:00:00.000Z',
+      binanceMethod: 'median' as const,
+    };
+
+    expect(purchaseRecordSchema.safeParse(purchase).success).toBe(true);
+    expect(
+      purchaseRecordSchema.safeParse({
+        ...purchase,
+        purchaseDate: '2024-01-02',
+        rateReference,
+      }).success,
+    ).toBe(true);
+    expect(
+      purchaseRecordSchema.safeParse({
+        ...purchase,
+        purchaseDate: '2024-02-30',
+        rateReference,
+      }).success,
+    ).toBe(false);
+    expect(
+      purchaseRecordSchema.safeParse({
+        ...purchase,
+        purchaseDate: '2024-01-02',
+        rateReference: { ...rateReference, binanceMethod: 'quote' },
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects an invalid purchase status and missing persisted-state fields', () => {

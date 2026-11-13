@@ -53,6 +53,48 @@
   overflow-wrap: anywhere;
 }
 
+.storageGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.storageItem {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.storageLabel {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 620;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.storageValue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.storageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+@media (max-width: 520px) {
+  .storageGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .errorNotice,
 .successNotice {
   padding: 0.8rem 1rem;

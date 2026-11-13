@@ -88,7 +88,10 @@ describe('computeKpis', () => {
     };
     const purchases = [
       createPurchase('pending', 'pending', { totalCostBs: 1_000 }),
-      createPurchase('credited', 'usd_credited', { totalCostBs: 1_500 }),
+      createPurchase('credited', 'usd_credited', {
+        totalCostBs: 1_500,
+        executedInvestmentVes: 1_500,
+      }),
       createPurchase('deposited', 'deposited_binance', { totalCostBs: 2_000 }),
       createPurchase('completed-executed', 'completed', {
         totalCostBs: 5_000,
@@ -113,6 +116,15 @@ describe('computeKpis', () => {
       weightedRoiPct: 2,
       completedCount: 2,
       cancelledCount: 1,
+      capitalInTransitVes: 1_000,
+      capitalInTransitUsd: 24.88,
+      capitalInBankVes: 1_500,
+      capitalInBankUsd: 24.88,
+      capitalInBinanceVes: 2_000,
+      capitalInBinanceUsdt: 24.13,
+      realizedProfitVes: 150,
+      realizedProfitUsdt: 3.03,
+      realizedRoiPct: 2,
     });
   });
 
@@ -136,6 +148,15 @@ describe('computeKpis', () => {
       weightedRoiPct: 0,
       completedCount: 0,
       cancelledCount: 0,
+      capitalInTransitVes: 0,
+      capitalInTransitUsd: 0,
+      capitalInBankVes: 0,
+      capitalInBankUsd: 0,
+      capitalInBinanceVes: 0,
+      capitalInBinanceUsdt: 0,
+      realizedProfitVes: 0,
+      realizedProfitUsdt: 0,
+      realizedRoiPct: 0,
     });
   });
 
@@ -158,5 +179,7 @@ describe('computeKpis', () => {
     expect(result.completedProfitBs).toBe(0.03);
     expect(result.completedCostBs).toBe(0.3);
     expect(result.weightedRoiPct).toBeCloseTo(10, 12);
+    expect(result.realizedProfitVes).toBe(0.03);
+    expect(result.realizedRoiPct).toBeCloseTo(10, 12);
   });
 });

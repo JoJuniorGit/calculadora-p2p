@@ -183,3 +183,84 @@ reproducible from its snapshot even after profiles/rates change.
 - Change request applied: demo data loading removed at user request (App button/dialog, store `loadDemoData` and demo helpers, demo store test). App smoke test now asserts the empty state; suite 55 tests including the financial table/action and calculator profile-priority tests.
 - Financial audit applied: intervention on Base_Bs, card inverse fee, Binance percentage on USD_2, fixed USDT P2P fee deducted at sale at the effective rate, effectiveBuyRate independent of the market P2P quote, symmetric Bs.S/USD inverse. 73 tests green; build green.
 - Inverse Bs.S symmetry hardened: the entered total is anchored exactly even when cent rounding cannot represent the sum of the fee stages. 74 tests green.
+
+## FIFO inventory extension (authoritative post-delivery spec)
+
+### Objective
+
+Replace the single-purchase completion flow with seven purchase states, FIFO lot
+inventory in Binance, independent P2P sale records, realized profit/ROI, lot
+traceability and reversible sale deletion.
+
+### Scope
+
+- `pending` (EN_ESPERA), `approved` (APROBADO), `usd_credited` (ACREDITADO),
+  `deposited_binance` (EN_BINANCE), `partial` (EN_BINANCE_PARCIAL), `completed`
+  (displayed "Completo") and `cancelled`.
+- Accreditation modal creates `approved`; `usd_credited` represents bank capital and
+  `deposited_binance` creates the lot with funding timestamp, initial USDT, unit cost,
+  remaining USDT/cost and empty allocations.
+- Pure `reconcileFifoInventory(purchases, sales)` in `domain/calculations.ts`: FIFO by
+  funding timestamp, creation timestamp, id; cost anti-cent rule; fixed 0.06 USDT P2P fee
+  prorated across consumed lots; exact remainder to the last lot; status transitions to
+  `partial`/`completed`; wallet balance after sale.
+- Sales persisted in `PersistedState.sales`; sale deletion rebuilds lots from origin.
+  Consumed purchases cannot be deleted or manually completed.
+- UI: stacked inventory KPIs, new inventory columns, sale capture with live FIFO preview,
+  sales table/detail, purchase allocation traceability and seven-state quick actions.
+- New tests: numeric three-lot example (539,935.20 VES received, 486,700 FIFO cost,
+  +53,235.20 profit, 10.94% ROI, lot 3 remaining 130 / 128,050 / +11,384.45), fee
+  proration, ordering, deletion restoration, insufficient balance and store guards.
+
+### Verification evidence
+
+- `src/domain/fifo.test.ts`: 7 tests green.
+- `src/features/sales/RegisterSaleModal.test.tsx`: 2 tests green (live preview + persistence).
+- Full suite: 105 tests green (`npx vitest run`).
+- `npm run build`: `tsc --noEmit` + Vite build green (114 modules).
+- Numeric example reproduced by the engine tests.
+- Calculator input mode is persisted in `localStorage` under `calculadora-p2p:calculation-mode` and restored on mount; calculator test covers the restore/persist cycle.
+- The calculator "Inversión" hero metric now exposes a one-click copy action, matching the existing Retorno and Binance copy buttons.
+- The calculator enforces a minimum fixed P2P sale fee of 0.06 USDT (snapshot stores the effective fee), new profiles default to 0.06, and the purchase registration button opens a confirmation modal with the operation summary.
+- The records table now shows USD/USDT as the primary amount with the Bs.S equivalent underneath; the inventory column combines remaining USDT and remaining Bs.S cost. The standalone ROI column was removed; the Utilidad column shows USD as primary and ROI as secondary. **Inversión** is the exception: total real cost in Bs.S is primary and USD bought at the bank is secondary. **Resultado** shows Bs.S obtained from sale as primary and USD as secondary; utility is blank until the purchase is `Completo`.
+- Navigation moved to a sticky sidebar on desktop, collapsing to a horizontal bar on narrow screens. The records cards were renamed to **Compras** and **Ventas**, and purchase/sale table headers no longer carry currency symbols.
+- The sidebar is collapsible through the accessible **Menú** button placed left of the BCV/P2P/brecha ticker; it renders as a fixed overlay with backdrop so opening it never changes content width.
+- Records is split into **Compras** and **Ventas** views, each with independent pagination (10 rows per page) and its own count; purchase filters/data stay in the Compras view.
+- The purchase filter block was converted into a compact single-row toolbar with inline labels, grouped date range, filter icon and a ghost clear action enabled only when filters are active.
+- All numeric fields now use ATM-style entry: only digits are accepted, values shift from right to left with fixed decimals (2 by default, 4 for rates), and the display is formatted with separators. Tests cover the shift, 4-decimal rates and zero deletion.
+- Final navigation revision: the sidebar/menu overlay was removed and the four section links (Calculadora, Perfiles, Tasas, Registros) are direct header tabs, preserving keyboard shortcuts and active-tab persistence.
+- Added a historical P2P/BCV chart in Tasas: Binance P2P from `dolar-vzla.rafnixg.dev` and official BCV from DolarApi (both CORS-enabled), hourly 24h buckets with dashed gaps, daily open/close plus min/max band for 7d, daily averages for 30/90d, price/gap modes, break-even line, and purchase/sale pins. BCV is forward-filled up to 72h.
+- Accounting KPI cards now show capital and realized profit with USD/USDT as the primary value and the Bs.S equivalent underneath; KPI tests assert the USD/USDT aggregates.
+- Interbank cost now applies sequentially on `Base_Bs + 0.50% intervention`; the old initial-base option was removed from the profile form and the engine/tests were updated.
+- Mobile calculator summary (Inversión, Retorno, USD Adjudicados, Monto a Ingresar en Binance, traffic light) is rendered between the amount field and the rate summary; desktop keeps it in the receipt column.
+
+
+## UI polish pass (2026-11-11)
+
+- Refreshed global design tokens: radii, spacing scale, shadows, selection/focus states and layered backgrounds; added a compact P2P brand mark in the header.
+- Rebuilt the mobile header as a two-row grid (brand/theme, then horizontally scrollable direct tabs) and verified no horizontal page overflow at 320, 360, 390, 768, 1024 and 1440 px.
+- Standardized interactive controls to 44 px minimum height; mobile modals now render as bottom sheets with safe-area padding and a 44 px close button.
+- Tightened responsive grids: calculator hero/results stay 2 columns down to 360 px, records KPIs 2 columns down to 340 px, and bank commission tiles use 2 columns down to 360 px.
+- Records toolbar uses inline filters that no longer wrap; purchase and sale views keep independent 10-row pagination.
+- Added mobile sale cards with date, USDT, rate, VES received, FIFO cost, profit, ROI, balance and actions; the desktop sales table is hidden below 900 px. Verified at 390 px with seeded sale data: mobile list visible, table hidden, page width equals viewport.
+- Added a mobile chart horizontal-scroll hint and 520 px chart minimum width; the 7-day smoke screenshot confirms the hint renders.
+- Verification: 
+px vitest run --reporter=dot -> 105/105 green; 
+px tsc --noEmit -> clean; 
+px vite build -> green (117 modules).
+
+## Light-theme depth pass (2026-11-11)
+
+- Replaced the near-white light palette with a layered surface system:
+  - app background #F3F4F6;
+  - cards and ticker #FFFFFF;
+  - inner surfaces #F1F5F9;
+  - input surfaces #F9FAFB;
+  - borders #E2E8F0, strong borders #CBD5E1.
+- Primary text is now #0F172A; secondary text #64748B.
+- Added the prescribed soft card shadow (  4px 6px -1px rgba(15,23,42,.05), 0 2px 4px -1px rgba(15,23,42,.03)); card headers stay pure white in light mode.
+- Removed the white top wash from the light background; the dark theme keeps its previous gradient and surface values through dedicated tokens.
+- Calculator hero/result boxes, rate summary, records date controls, mobile record cards and mobile sale cards use the inner/summary surfaces.
+- Verified at 1440px and 390px in light mode; body is gb(243,244,246), cards gb(255,255,255), inputs gb(249,250,251), inner metrics gb(241,245,249), no horizontal page overflow.
+- Dark-mode check preserved gb(8,13,20) body, gb(16,25,37) cards/inputs and the previous 1px card shadow.
+- Verification: 105/105 tests green and production build green.

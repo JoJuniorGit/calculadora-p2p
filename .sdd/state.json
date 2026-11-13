@@ -1,0 +1,17 @@
+{
+  "project": "Calculadora P2P",
+  "initialized": true,
+  "current_change": "change-001",
+  "changes": [
+    {
+      "id": "change-001",
+      "title": "PWA and IndexedDB migration",
+      "status": "VERIFIED",
+      "proposal": ".sdd/proposals/change-001.md",
+      "spec": ".sdd/specs/change-001.md",
+      "design": ".sdd/designs/change-001.md",
+      "tasks": ".sdd/tasks/change-001.md",
+      "verification": ".sdd/archive/change-001-verification.md"
+    }
+  ]
+}

@@ -4,10 +4,18 @@ import styles from './InfoTooltip.module.css';
 export interface InfoTooltipProps {
   label: string;
   content: string;
+  align?: 'start' | 'center' | 'end';
 }
 
-export function InfoTooltip({ label, content }: InfoTooltipProps) {
+export function InfoTooltip({ label, content, align = 'end' }: InfoTooltipProps) {
   const tooltipId = useId();
+  const tooltipClassName = [
+    styles.tooltip,
+    align === 'start' ? styles.tooltipStart : '',
+    align === 'center' ? styles.tooltipCenter : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <span className={styles.root}>
@@ -19,7 +27,7 @@ export function InfoTooltip({ label, content }: InfoTooltipProps) {
       >
         <span aria-hidden="true">ⓘ</span>
       </button>
-      <span className={styles.tooltip} id={tooltipId} role="tooltip">
+      <span className={tooltipClassName} id={tooltipId} role="tooltip">
         {content}
       </span>
     </span>

@@ -5,15 +5,30 @@ import type {
   CalculationMode,
   CalculationOptions,
   CalculationResult,
+  PurchaseRateReference,
+  PurchaseRecordMetadata,
 } from '../../domain/types';
-import { calculate, getExchangeGap } from '../../domain/calculations';
+import { calculate, DEFAULT_P2P_FIXED_FEE_USDT, getExchangeGap } from '../../domain/calculations';
 import { useAppStore } from '../../store/useAppStore';
-import { formatBs, formatPct, formatPctWithFixedUsd, formatRate, formatUsd } from '../../utils/format';
+import {
+  formatBs,
+  formatDateOnly,
+  formatPct,
+  formatPctWithFixedUsd,
+  formatRate,
+  formatUsd,
+} from '../../utils/format';
+import {
+  fetchHistoricalRateForDate,
+  type HistoricalRateForDate,
+} from '../rates/ratesApi';
+import { useAutoRateRefresh } from '../rates/useAutoRateRefresh';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { CopyButton } from '../../components/ui/CopyButton';
 import { FilterChip } from '../../components/ui/FilterChip';
+import { Modal } from '../../components/ui/Modal';
 import { NumberField } from '../../components/ui/NumberField';
 import { SelectField } from '../../components/ui/SelectField';
 import { TextField } from '../../components/ui/TextField';
@@ -23,13 +38,84 @@ import styles from './CalculatorPanel.module.css';
 const RATE_CONFIGURATION_HINT =
   'Configura la tasa BCV y la tasa Binance P2P en la pestaña Tasas.';
 
+export const CALCULATION_MODE_STORAGE_KEY = 'calculadora-p2p:calculation-mode';
+export const BANK_PROFILE_STORAGE_KEY = 'calculadora-p2p:bank-profile';
+
+function isCalculationMode(value: string): value is CalculationMode {
+  return value === 'bs' || value === 'usd';
+}
+
+function readStoredCalculationMode(): CalculationMode {
+  try {
+    if (typeof window === 'undefined') return 'bs';
+    const stored = window.localStorage.getItem(CALCULATION_MODE_STORAGE_KEY);
+    return stored !== null && isCalculationMode(stored) ? stored : 'bs';
+  } catch {
+    return 'bs';
+  }
+}
+
+function persistCalculationMode(mode: CalculationMode): void {
+  try {
+    window.localStorage.setItem(CALCULATION_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Storage can be unavailable in private/full modes; the mode remains in memory.
+  }
+}
+
+function readStoredBankProfileId(profiles: readonly BankProfile[]): string {
+  const fallback = profiles[0]?.id ?? '';
+  try {
+    if (typeof window === 'undefined') return fallback;
+    const stored = window.localStorage.getItem(BANK_PROFILE_STORAGE_KEY);
+    return stored !== null && profiles.some((profile) => profile.id === stored)
+      ? stored
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function persistBankProfileId(profileId: string): void {
+  try {
+    if (profileId === '') return;
+    window.localStorage.setItem(BANK_PROFILE_STORAGE_KEY, profileId);
+  } catch {
+    // Storage can be unavailable in private/full modes; the selection remains in memory.
+  }
+}
+
 interface CalculationState {
   input: CalculationInput | null;
   result: CalculationResult | null;
   amountError: string | undefined;
+  dateError: string | undefined;
   engineError: string | null;
   ratesConfigured: boolean;
 }
+
+interface HistoricalRateDraft {
+  bcv: string;
+  binance: string;
+  editedBcv: boolean;
+  editedBinance: boolean;
+}
+
+type HistoricalRateLookup =
+  | { status: 'idle' }
+  | { status: 'loading'; date: string }
+  | {
+      status: 'loaded';
+      date: string;
+      rates: HistoricalRateForDate;
+      draft: HistoricalRateDraft;
+    }
+  | {
+      status: 'error';
+      date: string;
+      message: string;
+      draft: HistoricalRateDraft;
+    };
 
 interface Feedback {
   tone: 'success' | 'error';
@@ -52,28 +138,211 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function getLocalDateStamp(date = new Date()): string {
+  const year = String(date.getFullYear()).padStart(4, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isValidDateOnly(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(0);
+  date.setFullYear(year, month - 1, day);
+  date.setHours(12, 0, 0, 0);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+function getPurchaseDateError(value: string, today: string): string | undefined {
+  if (!value) return 'Selecciona la fecha de compra.';
+  if (!isValidDateOnly(value)) return 'La fecha de compra no es válida.';
+  if (value > today) return 'La fecha de compra no puede ser futura.';
+  return undefined;
+}
+
+function parsePositiveRate(value: string): number | null {
+  const normalized = value.trim().replace(',', '.');
+  if (!normalized) return null;
+  const rate = Number(normalized);
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
+}
+
+function createHistoricalRateDraft(rates: HistoricalRateForDate): HistoricalRateDraft {
+  return {
+    bcv: String(rates.bcv.value),
+    binance: String(rates.binance.value),
+    editedBcv: false,
+    editedBinance: false,
+  };
+}
+
+function getRateReferenceForDate(
+  date: string,
+  lookup: HistoricalRateLookup,
+): PurchaseRateReference | undefined {
+  if (lookup.status === 'loaded' && lookup.date === date) {
+    const { draft, rates } = lookup;
+    const editedBcv = draft.editedBcv;
+    const editedBinance = draft.editedBinance;
+    const wasEdited = editedBcv || editedBinance;
+
+    return {
+      source: wasEdited ? 'manual' : 'historical',
+      bcvAsOf: editedBcv ? date : rates.bcv.capturedAt,
+      bcvForwardFilled: editedBcv ? false : rates.bcv.forwardFilled,
+      binanceAsOf: editedBinance ? null : rates.binance.capturedAt,
+      binanceMethod: editedBinance ? 'manual' : rates.binance.method,
+    };
+  }
+
+  if (lookup.status === 'error' && lookup.date === date) {
+    return {
+      source: 'manual',
+      bcvAsOf: date,
+      bcvForwardFilled: false,
+      binanceAsOf: null,
+      binanceMethod: 'manual',
+    };
+  }
+
+  return undefined;
+}
+
 function displayRate(value: number): string {
   return Number.isFinite(value) && value > 0 ? `${formatRate(value)} Bs.S/USD` : 'Sin configurar';
+}
+
+interface HeroSummaryProps {
+  result: CalculationResult | null;
+  profitabilityTone: 'success' | 'warning' | 'danger' | 'neutral';
+  profitabilityLabel: string;
+  className: string;
+  testId?: string;
+}
+
+function HeroSummary({
+  result,
+  profitabilityTone,
+  profitabilityLabel,
+  className,
+  testId,
+}: HeroSummaryProps) {
+  return (
+    <div className={`${styles.heroSummary} ${className}`} data-testid={testId}>
+      <div className={styles.heroGrid}>
+        <article
+          className={styles.heroMetric}
+          title="Monto en Bs.S dedicado a la compra BCV + 0,50%."
+        >
+          <span className={styles.metricLabel}>Inversión</span>
+          <div className={styles.heroValueRow}>
+            <strong className={styles.heroValue}>{formatBs(result?.bcvPurchaseBs ?? 0)}</strong>
+            <CopyButton
+              value={(result?.bcvPurchaseBs ?? 0).toFixed(2)}
+              label="inversión en Bs.S"
+              disabled={!result}
+            />
+          </div>
+        </article>
+        <article
+          className={`${styles.heroMetric} ${styles.secondaryMetric}`}
+          title="Total en Bs.S esperado por la venta de las divisas."
+        >
+          <span className={styles.metricLabel}>Retorno</span>
+          <div className={styles.heroValueRow}>
+            <strong className={styles.heroValue}>{formatBs(result?.bsOut ?? 0)}</strong>
+            <CopyButton
+              value={(result?.bsOut ?? 0).toFixed(2)}
+              label="retorno en Bs.S"
+              disabled={!result}
+            />
+          </div>
+        </article>
+        <article
+          className={styles.heroMetric}
+          title="Total de divisas adquiridas en el banco."
+        >
+          <span className={styles.metricLabel}>USD Adjudicados</span>
+          <strong className={styles.heroValue}>{formatUsd(result?.usdBought ?? 0)}</strong>
+        </article>
+        <article
+          className={`${styles.heroMetric} ${styles.primaryMetric}`}
+          title="USD máximos para depositar en Binance, después de la comisión de la tarjeta."
+        >
+          <span className={styles.metricLabel}>Monto a Ingresar en Binance</span>
+          <div className={styles.heroValueRow}>
+            <strong className={styles.heroValue} data-testid="binance-amount">
+              {formatUsd(result?.usdForBinance ?? 0)}
+            </strong>
+            <CopyButton
+              value={(result?.usdForBinance ?? 0).toFixed(2)}
+              label="monto a ingresar en Binance"
+              disabled={!result}
+            />
+          </div>
+        </article>
+      </div>
+
+      <div className={styles.profitabilitySummary}>
+        <span className={styles.trafficLight} data-testid="traffic-light">
+          <Badge tone={profitabilityTone}>{profitabilityLabel}</Badge>
+        </span>
+        <p className={styles.profitabilityLegend}>
+          Verde &gt; 3% · Amarillo &gt; 0% · Rojo ≤ 0%
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export function CalculatorPanel() {
   const profiles = useAppStore((state) => state.profiles);
   const rates = useAppStore((state) => state.rates);
   const recordPurchase = useAppStore((state) => state.recordPurchase);
-  const [mode, setMode] = useState<CalculationMode>('bs');
+  const [mode, setMode] = useState<CalculationMode>(readStoredCalculationMode);
   const [amountText, setAmountText] = useState('');
   const [amountTouched, setAmountTouched] = useState(false);
-  const [profileId, setProfileId] = useState(() => profiles[0]?.id ?? '');
+  const [profileId, setProfileId] = useState(() => readStoredBankProfileId(profiles));
   const [options, setOptions] = useState<CalculationOptions>(() =>
-    optionsFromProfile(profiles[0] ?? null),
+    optionsFromProfile(
+      profiles.find((profile) => profile.id === profileId) ?? profiles[0] ?? null,
+    ),
   );
   const [notes, setNotes] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(getLocalDateStamp);
+  const [historicalRateLookup, setHistoricalRateLookup] =
+    useState<HistoricalRateLookup>({ status: 'idle' });
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [confirmRegisterOpen, setConfirmRegisterOpen] = useState(false);
   const [registeredSignature, setRegisteredSignature] = useState<string | null>(null);
   const registeredSignatureRef = useRef<string | null>(null);
+  const historicalRequestRef = useRef<{
+    date: string;
+    promise: Promise<HistoricalRateForDate>;
+  } | null>(null);
 
+  const today = getLocalDateStamp();
+  const isTodayDate = purchaseDate === today;
+  const isPastDate = purchaseDate !== '' && purchaseDate < today;
+  const dateError = getPurchaseDateError(purchaseDate, today);
   const selectedProfile = profiles.find((profile) => profile.id === profileId) ?? profiles[0] ?? null;
   const selectedProfileId = selectedProfile?.id;
+  const amountValue =
+    amountText.trim() === '' ? Number.NaN : Number(amountText.replace(',', '.'));
+  const validAmount = Number.isFinite(amountValue) && amountValue > 0;
+  const autoRateRefresh = useAutoRateRefresh(
+    isTodayDate && validAmount ? amountText.trim() : null,
+  );
 
   useEffect(() => {
     if (profiles.length === 0) {
@@ -90,30 +359,124 @@ export function CalculatorPanel() {
     setOptions(optionsFromProfile(selectedProfile));
   }, [selectedProfileId]);
 
-  const ratesConfigured =
+  useEffect(() => {
+    persistCalculationMode(mode);
+  }, [mode]);
+
+  useEffect(() => {
+    persistBankProfileId(profileId);
+  }, [profileId]);
+
+  useEffect(() => {
+    if (!isPastDate) {
+      setHistoricalRateLookup({ status: 'idle' });
+      return;
+    }
+
+    let active = true;
+    const date = purchaseDate;
+    setHistoricalRateLookup({ status: 'loading', date });
+    const pendingRequest =
+      historicalRequestRef.current?.date === date
+        ? historicalRequestRef.current.promise
+        : fetchHistoricalRateForDate(date);
+    historicalRequestRef.current = { date, promise: pendingRequest };
+
+    void pendingRequest.then(
+      (historicalRates) => {
+        if (historicalRequestRef.current?.promise === pendingRequest) {
+          historicalRequestRef.current = null;
+        }
+        if (!active) return;
+        setHistoricalRateLookup({
+          status: 'loaded',
+          date,
+          rates: historicalRates,
+          draft: createHistoricalRateDraft(historicalRates),
+        });
+      },
+      (error: unknown) => {
+        if (historicalRequestRef.current?.promise === pendingRequest) {
+          historicalRequestRef.current = null;
+        }
+        if (!active) return;
+        setHistoricalRateLookup({
+          status: 'error',
+          date,
+          message: getErrorMessage(
+            error,
+            'No fue posible consultar las tasas históricas. Ingresa ambas tasas manualmente.',
+          ),
+          draft: { bcv: '', binance: '', editedBcv: false, editedBinance: false },
+        });
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [isPastDate, purchaseDate]);
+
+  const selectedHistoricalLookup: HistoricalRateLookup | null = isPastDate
+    ? historicalRateLookup.status !== 'idle' && historicalRateLookup.date === purchaseDate
+      ? historicalRateLookup
+      : { status: 'loading', date: purchaseDate }
+    : null;
+  const historicalDraft =
+    selectedHistoricalLookup?.status === 'loaded' ||
+    selectedHistoricalLookup?.status === 'error'
+      ? selectedHistoricalLookup.draft
+      : null;
+  const effectiveBcvRate = isTodayDate
+    ? rates.bcv.value
+    : parsePositiveRate(historicalDraft?.bcv ?? '') ?? 0;
+  const effectiveBinanceRate = isTodayDate
+    ? rates.binance.value
+    : parsePositiveRate(historicalDraft?.binance ?? '') ?? 0;
+  const liveRatesConfigured =
     Number.isFinite(rates.bcv.value) &&
     rates.bcv.value > 0 &&
     Number.isFinite(rates.binance.value) &&
     rates.binance.value > 0;
+  const ratesConfigured = isTodayDate
+    ? liveRatesConfigured
+    : isPastDate && effectiveBcvRate > 0 && effectiveBinanceRate > 0;
+  const rateReference =
+    isPastDate && selectedHistoricalLookup
+      ? getRateReferenceForDate(purchaseDate, selectedHistoricalLookup)
+      : undefined;
+  const rateSource = isTodayDate
+    ? 'live'
+    : rateReference?.source ??
+      (selectedHistoricalLookup?.status === 'error' ? 'manual' : isPastDate ? 'historical' : null);
+  const rateSourceLabel =
+    rateSource === 'live'
+      ? 'En vivo'
+      : rateSource === 'historical'
+        ? 'Histórica'
+        : rateSource === 'manual'
+          ? 'Manual'
+          : '—';
 
   const exchangeGap = useMemo(
     () =>
       ratesConfigured
-        ? getExchangeGap(rates.bcv.value, rates.binance.value)
+        ? getExchangeGap(effectiveBcvRate, effectiveBinanceRate)
         : null,
-    [rates.bcv.value, rates.binance.value, ratesConfigured],
+    [effectiveBcvRate, effectiveBinanceRate, ratesConfigured],
   );
 
   const calculation = useMemo<CalculationState>(() => {
-    const amount = amountText.trim() === '' ? Number.NaN : Number(amountText.replace(',', '.'));
+    const amount = amountValue;
     const amountError =
       !Number.isFinite(amount) || amount <= 0 ? 'Ingresa un monto válido mayor que 0.' : undefined;
 
-    if (!selectedProfile || !ratesConfigured || amountError) {
+    if (!selectedProfile || !ratesConfigured || amountError || dateError) {
       return {
         input: null,
         result: null,
         amountError,
+        dateError,
         engineError: null,
         ratesConfigured,
       };
@@ -122,8 +485,8 @@ export function CalculatorPanel() {
     const input: CalculationInput = {
       mode,
       amount,
-      bcvRate: rates.bcv.value,
-      binanceRate: rates.binance.value,
+      bcvRate: effectiveBcvRate,
+      binanceRate: effectiveBinanceRate,
       profile: selectedProfile,
       options,
     };
@@ -133,6 +496,7 @@ export function CalculatorPanel() {
         input,
         result: calculate(input),
         amountError,
+        dateError,
         engineError: null,
         ratesConfigured,
       };
@@ -141,16 +505,18 @@ export function CalculatorPanel() {
         input,
         result: null,
         amountError,
+        dateError,
         engineError: getErrorMessage(error, 'No fue posible calcular la operación.'),
         ratesConfigured,
       };
     }
   }, [
     amountText,
+    dateError,
+    effectiveBcvRate,
+    effectiveBinanceRate,
     mode,
     options,
-    rates.bcv.value,
-    rates.binance.value,
     ratesConfigured,
     selectedProfile,
   ]);
@@ -161,8 +527,8 @@ export function CalculatorPanel() {
     const input: CalculationInput = {
       mode: 'usd',
       amount: 100,
-      bcvRate: rates.bcv.value,
-      binanceRate: rates.binance.value,
+      bcvRate: effectiveBcvRate,
+      binanceRate: effectiveBinanceRate,
       profile: selectedProfile,
       options,
     };
@@ -173,17 +539,28 @@ export function CalculatorPanel() {
       return null;
     }
   }, [
+    effectiveBcvRate,
+    effectiveBinanceRate,
     options,
-    rates.bcv.value,
-    rates.binance.value,
     ratesConfigured,
     selectedProfile,
   ]);
 
   const calculationSignature =
-    calculation.input && calculation.result ? JSON.stringify(calculation.input) : null;
+    calculation.input && calculation.result
+      ? JSON.stringify({
+          input: calculation.input,
+          purchaseDate,
+          rateReference: rateReference ?? null,
+        })
+      : null;
   const alreadyRegistered =
     calculationSignature !== null && registeredSignature === calculationSignature;
+  const canRegister =
+    calculation.input !== null &&
+    calculation.result !== null &&
+    !dateError &&
+    !alreadyRegistered;
 
   useEffect(() => {
     setFeedback(null);
@@ -193,6 +570,39 @@ export function CalculatorPanel() {
     setFeedback(null);
     setRegisteredSignature(null);
     registeredSignatureRef.current = null;
+  };
+
+  const handlePurchaseDateChange = (nextDate: string): void => {
+    if (nextDate === purchaseDate) return;
+    setPurchaseDate(nextDate);
+    setHistoricalRateLookup(
+      nextDate !== '' && nextDate < today
+        ? { status: 'loading', date: nextDate }
+        : { status: 'idle' },
+    );
+    clearFeedback();
+  };
+
+  const updateHistoricalRate = (field: 'bcv' | 'binance', value: string): void => {
+    clearFeedback();
+    setHistoricalRateLookup((current) => {
+      if (
+        (current.status !== 'loaded' && current.status !== 'error') ||
+        current.date !== purchaseDate
+      ) {
+        return current;
+      }
+
+      const editedField = field === 'bcv' ? 'editedBcv' : 'editedBinance';
+      return {
+        ...current,
+        draft: {
+          ...current.draft,
+          [field]: value,
+          [editedField]: true,
+        },
+      };
+    });
   };
 
   const handleProfileChange = (nextProfileId: string): void => {
@@ -218,7 +628,11 @@ export function CalculatorPanel() {
     registeredSignatureRef.current = calculationSignature;
 
     try {
-      recordPurchase(input, notes.trim());
+      const metadata: PurchaseRecordMetadata = {
+        purchaseDate,
+        ...(rateReference ? { rateReference } : {}),
+      };
+      recordPurchase(input, notes.trim(), metadata);
       setRegisteredSignature(calculationSignature);
       setNotes('');
       setFeedback({
@@ -255,8 +669,25 @@ export function CalculatorPanel() {
     [];
   const breakEvenRate = result?.breakEvenRate ?? referenceResult?.breakEvenRate;
   const minGapPct = result?.minGapPct ?? referenceResult?.minGapPct;
-  const amountValue = amountText.trim() === '' ? Number.NaN : Number(amountText.replace(',', '.'));
-  const validAmount = Number.isFinite(amountValue) && amountValue > 0;
+  const loadedHistoricalLookup =
+    selectedHistoricalLookup?.status === 'loaded' ? selectedHistoricalLookup : null;
+  const binanceReferenceLabel =
+    loadedHistoricalLookup?.rates.binance.method === 'average'
+      ? 'promedio diario'
+      : 'mediana diaria';
+  const historicalRateMessage = loadedHistoricalLookup
+    ? [
+        `Fuente aplicada: ${rateSourceLabel}.`,
+        loadedHistoricalLookup.draft.editedBcv
+          ? 'BCV ajustado manualmente.'
+          : loadedHistoricalLookup.rates.bcv.forwardFilled
+            ? `BCV: sin publicación para esta fecha; se arrastra la última tasa oficial publicada el ${formatDateOnly(loadedHistoricalLookup.rates.bcv.capturedAt.slice(0, 10))}.`
+            : `BCV: tasa oficial publicada el ${formatDateOnly(loadedHistoricalLookup.rates.bcv.capturedAt.slice(0, 10))}.`,
+        loadedHistoricalLookup.draft.editedBinance
+          ? 'Binance P2P ajustado manualmente.'
+          : 'Binance P2P: ' + binanceReferenceLabel + ' de muestras; es una referencia, no una cotización exacta ejecutada.',
+      ].join(' ')
+    : null;
   const profitabilityTone =
     result?.profitability === 'green'
       ? 'success'
@@ -274,15 +705,21 @@ export function CalculatorPanel() {
           ? 'No rentable'
           : !validAmount
             ? 'Sin monto'
+            : dateError
+              ? 'Sin fecha'
             : !selectedProfile
               ? 'Sin perfil'
               : !calculation.ratesConfigured
                 ? 'Sin tasas'
                 : 'Sin cálculo';
-  const waterfallHint = !selectedProfile
+  const waterfallHint = dateError
+    ? 'Selecciona una fecha de compra válida para generar el desglose.'
+    : !selectedProfile
     ? 'Crea un perfil bancario para generar el desglose.'
     : !calculation.ratesConfigured
-      ? 'Configura las tasas BCV y Binance P2P para ver el desglose.'
+      ? isPastDate
+        ? 'Espera la consulta histórica o ingresa ambas tasas manualmente para ver el desglose.'
+        : 'Configura las tasas BCV y Binance P2P para ver el desglose.'
       : 'No fue posible generar el desglose con la configuración actual.';
 
   return (
@@ -321,7 +758,10 @@ export function CalculatorPanel() {
                       Binance:{' '}
                       {formatPctWithFixedUsd(
                         selectedProfile.binanceDepositPct,
-                        selectedProfile.binanceDepositFixedUsd,
+                        Math.max(
+                          selectedProfile.binanceDepositFixedUsd,
+                          DEFAULT_P2P_FIXED_FEE_USDT,
+                        ),
                         Number.isInteger(selectedProfile.binanceDepositPct) ? 0 : 2,
                       )}
                     </span>
@@ -384,20 +824,103 @@ export function CalculatorPanel() {
                 error={amountTouched ? calculation.amountError : undefined}
                 hint={amountHint}
               />
+
+              <div className={styles.dateField}>
+                <TextField
+                  label="Fecha de compra"
+                  name="calculator-purchase-date"
+                  type="date"
+                  value={purchaseDate}
+                  max={today}
+                  onChange={handlePurchaseDateChange}
+                  error={dateError}
+                  hint="Hoy se usan las tasas actuales; las fechas anteriores consultan el historial."
+                />
+              </div>
             </div>
 
-            <dl className={styles.rateSummary} aria-label="Tasas actuales">
+            {isPastDate && (
+              <div
+                className={styles.historicalRateFields}
+                aria-label={`Tasas para la compra del ${formatDateOnly(purchaseDate)}`}
+                aria-busy={selectedHistoricalLookup?.status === 'loading'}
+              >
+                {selectedHistoricalLookup?.status === 'loading' && (
+                  <p className={styles.historicalRateMessage} role="status">
+                    Consultando tasas históricas para {formatDateOnly(purchaseDate)}…
+                  </p>
+                )}
+                {selectedHistoricalLookup?.status === 'error' && (
+                  <p
+                    className={`${styles.historicalRateMessage} ${styles.historicalRateError}`}
+                    role="alert"
+                  >
+                    {selectedHistoricalLookup.message} No se usarán las tasas actuales; ingresa ambas tasas manualmente.
+                  </p>
+                )}
+                {historicalRateMessage && (
+                  <p className={styles.historicalRateMessage} role="note">
+                    {historicalRateMessage}
+                  </p>
+                )}
+                {historicalDraft && (
+                  <div className={styles.historicalRateInputs}>
+                    <NumberField
+                      label="Tasa BCV para esta compra"
+                      name="calculator-bcv-rate"
+                      value={historicalDraft.bcv}
+                      onChange={(value) => updateHistoricalRate('bcv', value)}
+                      suffix="Bs.S/USD"
+                      step={0.01}
+                      decimals={4}
+                      hint={
+                        historicalDraft.editedBcv
+                          ? 'Valor manual y local a esta compra.'
+                          : 'Tasa oficial publicada; puedes ajustarla manualmente.'
+                      }
+                    />
+                    <NumberField
+                      label="Referencia diaria Binance P2P"
+                      name="calculator-binance-rate"
+                      value={historicalDraft.binance}
+                      onChange={(value) => updateHistoricalRate('binance', value)}
+                      suffix="Bs.S/USD"
+                      step={0.01}
+                      decimals={4}
+                      hint={
+                        historicalDraft.editedBinance
+                          ? 'Valor manual y local a esta compra.'
+                          : 'Referencia diaria; no representa una cotización exacta ejecutada.'
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <HeroSummary
+              className={styles.mobileHeroSummary}
+              result={result}
+              profitabilityTone={profitabilityTone}
+              profitabilityLabel={profitabilityLabel}
+              testId="mobile-hero-summary"
+            />
+
+            <dl
+              className={styles.rateSummary}
+              aria-label={isTodayDate ? 'Tasas actuales' : 'Tasas aplicadas para la fecha de compra'}
+            >
               <div className={styles.rateItem}>
                 <dt>Tasa BCV</dt>
-                <dd>{displayRate(rates.bcv.value)}</dd>
+                <dd>{displayRate(effectiveBcvRate)}</dd>
               </div>
               <div className={styles.rateItem}>
                 <dt>Binance P2P</dt>
-                <dd>{displayRate(rates.binance.value)}</dd>
+                <dd>{displayRate(effectiveBinanceRate)}</dd>
               </div>
               {exchangeGap && (
                 <div className={`${styles.rateItem} ${styles.rateItemFull}`}>
-                  <dt>Brecha actual (vs BCV + 0,50%)</dt>
+                  <dt>{isTodayDate ? 'Brecha actual' : 'Brecha para esta fecha'} (vs BCV + 0,50%)</dt>
                   <dd>
                     {formatPct(exchangeGap.pct, 2)}
                     <span className={styles.rateDetail}>
@@ -408,7 +931,18 @@ export function CalculatorPanel() {
               )}
             </dl>
 
-            {!calculation.ratesConfigured && (
+            {autoRateRefresh.message && (
+              <p
+                className={`${styles.autoRateStatus} ${
+                  autoRateRefresh.status === 'error' ? styles.autoRateStatusError : ''
+                }`}
+                role={autoRateRefresh.status === 'error' ? 'alert' : 'status'}
+              >
+                {autoRateRefresh.message}
+              </p>
+            )}
+
+            {isTodayDate && !calculation.ratesConfigured && (
               <p className={styles.rateHint} role="note">
                 {RATE_CONFIGURATION_HINT}
               </p>
@@ -485,8 +1019,8 @@ export function CalculatorPanel() {
             <div className={styles.actionRow}>
               <Button
                 className={styles.registerButton}
-                onClick={handleRegister}
-                disabled={!calculation.input || !result || alreadyRegistered}
+                onClick={() => setConfirmRegisterOpen(true)}
+                disabled={!canRegister}
               >
                 Registrar compra
               </Button>
@@ -498,67 +1032,19 @@ export function CalculatorPanel() {
       <div className={styles.receiptColumn}>
         <Card title="Resumen de la Operación" className={styles.resultsCard}>
           <div className={styles.receiptContent}>
-            {!calculation.ratesConfigured && (
+            {isTodayDate && !calculation.ratesConfigured && (
               <p className={styles.receiptHint} role="note">
-                Configura ambas tasas para calcular resultados y break-even.
+                Configura ambas tasas para calcular resultados y tasa mínima.
               </p>
             )}
 
-            <div className={styles.heroGrid}>
-              <article
-                className={styles.heroMetric}
-                title="Monto en Bs.S dedicado a la compra BCV + 0,50%."
-              >
-                <span className={styles.metricLabel}>Inversión</span>
-                <strong className={styles.heroValue}>{formatBs(result?.bcvPurchaseBs ?? 0)}</strong>
-              </article>
-              <article
-                className={`${styles.heroMetric} ${styles.secondaryMetric}`}
-                title="Total en Bs.S esperado por la venta de las divisas."
-              >
-                <span className={styles.metricLabel}>Retorno</span>
-                <div className={styles.heroValueRow}>
-                  <strong className={styles.heroValue}>{formatBs(result?.bsOut ?? 0)}</strong>
-                  <CopyButton
-                    value={(result?.bsOut ?? 0).toFixed(2)}
-                    label="retorno en Bs.S"
-                    disabled={!result}
-                  />
-                </div>
-              </article>
-              <article
-                className={styles.heroMetric}
-                title="Total de divisas adquiridas en el banco."
-              >
-                <span className={styles.metricLabel}>USD Adjudicados</span>
-                <strong className={styles.heroValue}>{formatUsd(result?.usdBought ?? 0)}</strong>
-              </article>
-              <article
-                className={`${styles.heroMetric} ${styles.primaryMetric}`}
-                title="USD máximos para depositar en Binance, después de la comisión de la tarjeta."
-              >
-                <span className={styles.metricLabel}>Monto a Ingresar en Binance</span>
-                <div className={styles.heroValueRow}>
-                  <strong className={styles.heroValue} data-testid="binance-amount">
-                    {formatUsd(result?.usdForBinance ?? 0)}
-                  </strong>
-                  <CopyButton
-                    value={(result?.usdForBinance ?? 0).toFixed(2)}
-                    label="monto a ingresar en Binance"
-                    disabled={!result}
-                  />
-                </div>
-              </article>
-            </div>
-
-            <div className={styles.profitabilitySummary}>
-              <span className={styles.trafficLight} data-testid="traffic-light">
-                <Badge tone={profitabilityTone}>{profitabilityLabel}</Badge>
-              </span>
-              <p className={styles.profitabilityLegend}>
-                Verde &gt; 3% · Amarillo &gt; 0% · Rojo ≤ 0%
-              </p>
-            </div>
+            <HeroSummary
+              className={styles.receiptHeroSummary}
+              result={result}
+              profitabilityTone={profitabilityTone}
+              profitabilityLabel={profitabilityLabel}
+              testId="receipt-hero-summary"
+            />
 
             <div className={styles.receiptSeparator} aria-hidden="true" />
 
@@ -598,8 +1084,8 @@ export function CalculatorPanel() {
             {result && result.netProfitBs < 0 && (
               <div className={styles.lossBanner} role="alert">
                 La utilidad neta es negativa: la operación perdería{' '}
-                {formatBs(Math.abs(result.netProfitBs))} con estas tasas y comisiones. Verifica el
-                break-even antes de operar.
+                {formatBs(Math.abs(result.netProfitBs))} con estas tasas y comisiones. Verifica la
+                tasa mínima antes de operar.
               </div>
             )}
           </div>
@@ -615,6 +1101,103 @@ export function CalculatorPanel() {
           )}
         </Card>
       </div>
+
+      {confirmRegisterOpen && calculation.input && result && (
+        <Modal
+          open
+          title="Confirmar registro de compra"
+          onClose={() => setConfirmRegisterOpen(false)}
+        >
+          <div className={styles.confirmContent}>
+            <p className={styles.confirmHint}>
+              Revisa los datos antes de guardar la compra en Registros.
+            </p>
+            <dl className={styles.confirmSummary}>
+              <div>
+                <dt>Perfil bancario</dt>
+                <dd>{selectedProfile?.name ?? '-'}</dd>
+              </div>
+              <div>
+                <dt>Fecha de compra</dt>
+                <dd>{formatDateOnly(purchaseDate)}</dd>
+              </div>
+              <div>
+                <dt>Fuente de tasas</dt>
+                <dd>{rateSourceLabel}</dd>
+              </div>
+              <div>
+                <dt>Tasa BCV aplicada</dt>
+                <dd>{formatRate(calculation.input.bcvRate)} Bs.S/USD</dd>
+              </div>
+              <div>
+                <dt>Tasa Binance P2P aplicada</dt>
+                <dd>{formatRate(calculation.input.binanceRate)} Bs.S/USD</dd>
+              </div>
+              <div>
+                <dt>Modo de entrada</dt>
+                <dd>{mode === 'bs' ? 'Invertir Bs.S' : 'Solicitar USD'}</dd>
+              </div>
+              <div>
+                <dt>Monto ingresado</dt>
+                <dd>{mode === 'bs' ? formatBs(calculation.input.amount) : formatUsd(calculation.input.amount)}</dd>
+              </div>
+              <div>
+                <dt>Inversión</dt>
+                <dd>{formatBs(result.bcvPurchaseBs)}</dd>
+              </div>
+              <div>
+                <dt>Costo total</dt>
+                <dd>{formatBs(result.totalCostBs)}</dd>
+              </div>
+              <div>
+                <dt>Retorno estimado</dt>
+                <dd>{formatBs(result.bsOut)}</dd>
+              </div>
+              <div>
+                <dt>USD adjudicados</dt>
+                <dd>{formatUsd(result.usdBought)}</dd>
+              </div>
+              <div>
+                <dt>Monto a Binance</dt>
+                <dd>{formatUsd(result.usdForBinance)}</dd>
+              </div>
+              <div>
+                <dt>Comisión fija P2P</dt>
+                <dd>{formatUsd(result.binanceFixedFeeUsd)} · mínimo {formatUsd(DEFAULT_P2P_FIXED_FEE_USDT)}</dd>
+              </div>
+              <div>
+                <dt>Utilidad estimada</dt>
+                <dd className={result.netProfitBs < 0 ? styles.negativeValue : styles.positiveValue}>
+                  {formatBs(result.netProfitBs)} · {formatPct(result.roiPct, 2)}
+                </dd>
+              </div>
+            </dl>
+            {notes.trim() && (
+              <p className={styles.confirmHint}>
+                <strong>Notas:</strong> {notes.trim()}
+              </p>
+            )}
+            <div className={styles.confirmActions}>
+              <Button variant="secondary" onClick={() => setConfirmRegisterOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  setConfirmRegisterOpen(false);
+                  handleRegister();
+                }}
+              >
+                Confirmar compra
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }
+
+
+
+
+

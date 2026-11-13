@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { createAppStorage } from '../storage/indexedDb';
 import {
   calculate,
+  DEFAULT_P2P_FIXED_FEE_USDT,
   recalculateAccreditation,
+  reconcileFifoInventory,
   round2,
 } from '../domain/calculations';
-import { calculateExecution, canTransition } from '../domain/purchases';
+import { canTransition } from '../domain/purchases';
 import type {
   AccreditationType,
   BankProfile,
@@ -14,11 +17,14 @@ import type {
   DisclaimerConfig,
   PersistedState,
   PurchaseFilters,
+  PurchaseRecordMetadata,
   PurchaseRecord,
   PurchaseStatus,
   RateKey,
   RateSource,
   Rates,
+  SaleInput,
+  SaleRecord,
   StatusChange,
   ThemeMode,
 } from '../domain/types';
@@ -30,7 +36,7 @@ import {
   withLegacyAccreditationDefaults,
 } from '../domain/validation';
 import { createId } from '../utils/id';
-import { formatBs, formatPct, formatRate, formatUsd } from '../utils/format';
+import { formatBs, formatPct, formatUsd } from '../utils/format';
 
 export const SCHEMA_VERSION = 1;
 
@@ -56,6 +62,7 @@ export interface AppState {
   rates: Rates;
   profiles: BankProfile[];
   purchases: PurchaseRecord[];
+  sales: SaleRecord[];
   filters: PurchaseFilters;
   disclaimer: DisclaimerConfig;
   theme: ThemeMode;
@@ -67,10 +74,17 @@ export interface AppState {
 
   addProfile(draft: BankProfileDraft): BankProfile;
   updateProfile(id: string, draft: BankProfileDraft): void;
+  moveProfile(activeId: string, overId: string): void;
   deleteProfile(id: string): void;
 
-  recordPurchase(input: CalculationInput, notes?: string): PurchaseRecord;
+  recordPurchase(
+    input: CalculationInput,
+    notes?: string,
+    meta?: PurchaseRecordMetadata,
+  ): PurchaseRecord;
   accreditPurchase(id: string, request: AccreditationRequest): PurchaseRecord;
+  registerSale(input: SaleInput): SaleRecord;
+  deleteSale(id: string): void;
   changePurchaseStatus(
     id: string,
     nextStatus: PurchaseStatus,
@@ -96,6 +110,7 @@ function createPersistedDefaults(): PersistedState {
     },
     profiles: [],
     purchases: [],
+    sales: [],
     disclaimer: { enabled: false, text: DEFAULT_DISCLAIMER_TEXT },
     theme: 'light',
   };
@@ -103,6 +118,13 @@ function createPersistedDefaults(): PersistedState {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function moveArrayItem<T>(items: readonly T[], fromIndex: number, toIndex: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
 }
 
 function migratePersistedState(persistedState: unknown, _version: number): PersistedState {
@@ -133,12 +155,16 @@ function createPurchaseRecord(
   id: string,
   createdAt: string,
   notes: string,
+  metadata?: PurchaseRecordMetadata,
 ): PurchaseRecord {
   const result = calculate(input);
 
   return {
     id,
     createdAt,
+    ...(metadata?.purchaseDate !== undefined
+      ? { purchaseDate: metadata.purchaseDate }
+      : {}),
     profileId: result.snapshot.profileId,
     profileName: result.snapshot.profileName,
     mode: result.mode,
@@ -146,6 +172,9 @@ function createPurchaseRecord(
     amountBs: result.amountBs,
     bcvRate: result.snapshot.bcvRate,
     binanceRate: result.snapshot.binanceRate,
+    ...(metadata?.rateReference
+      ? { rateReference: { ...metadata.rateReference } }
+      : {}),
     snapshot: { ...result.snapshot },
     usdBought: result.usdBought,
     usdForBinance: result.usdForBinance,
@@ -157,6 +186,19 @@ function createPurchaseRecord(
     breakEvenRate: result.breakEvenRate,
     requestedInvestmentVes: result.amountBs,
     requestedUsd: result.usdBought,
+    requestedTotalCostVes: result.amountBs,
+    executedTotalCostVes: result.amountBs,
+    fundedToBinanceAt: null,
+    initialBinanceUsdt: 0,
+    unitCostInBinanceVes: 0,
+    soldUsdt: 0,
+    remainingBinanceUsdt: 0,
+    allocatedCostVesTotal: 0,
+    remainingCostVes: 0,
+    realizedRevenueVes: 0,
+    realizedProfitVes: 0,
+    weightedAverageSellRateVes: 0,
+    allocations: [],
     accreditationType: 'TOTAL',
     accreditedUsd: result.usdBought,
     accreditationRatePercent: 100,
@@ -177,6 +219,8 @@ function createPurchaseRecord(
     notes,
   };
 }
+
+const appStorage = createAppStorage();
 
 export const useAppStore = create<AppState>()(
   persist<AppState, [], [], PersistedState>(
@@ -224,12 +268,27 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      moveProfile: (activeId, overId) => {
+        if (activeId === overId) return;
+        const { profiles } = get();
+        const activeIndex = profiles.findIndex((profile) => profile.id === activeId);
+        const overIndex = profiles.findIndex((profile) => profile.id === overId);
+        if (activeIndex === -1 || overIndex === -1) return;
+        set({ profiles: moveArrayItem(profiles, activeIndex, overIndex) });
+      },
+
       deleteProfile: (id) =>
         set((state) => ({ profiles: state.profiles.filter((profile) => profile.id !== id) })),
 
-      recordPurchase: (input, notes = '') => {
+      recordPurchase: (input, notes = '', metadata) => {
         const timestamp = new Date().toISOString();
-        const purchase = createPurchaseRecord(input, createId(), timestamp, notes);
+        const purchase = createPurchaseRecord(
+          input,
+          createId(),
+          timestamp,
+          notes,
+          metadata,
+        );
         set((state) => ({ purchases: [purchase, ...state.purchases] }));
         return purchase;
       },
@@ -243,7 +302,7 @@ export const useAppStore = create<AppState>()(
         if (purchase.accreditationConfirmedAt !== null) {
           throw new Error('La acreditación de esta compra ya fue confirmada');
         }
-        if (!canTransition(purchase.status, 'usd_credited')) {
+        if (!canTransition(purchase.status, 'approved')) {
           throw new Error('Transición de estado no permitida');
         }
 
@@ -279,7 +338,7 @@ export const useAppStore = create<AppState>()(
           id: createId(),
           timestamp,
           fromStatus: purchase.status,
-          toStatus: 'usd_credited',
+          toStatus: 'approved',
           note: auditNote ? `${detail} · ${auditNote}` : detail,
           metadata: {
             accreditationType: preview.accreditationType,
@@ -303,13 +362,15 @@ export const useAppStore = create<AppState>()(
           estimatedProfitBs: preview.netProfitBs,
           estimatedRoiPct: preview.roiPct,
           breakEvenRate: preview.breakEvenRate,
+          requestedTotalCostVes: purchase.requestedTotalCostVes ?? purchase.requestedInvestmentVes,
+          executedTotalCostVes: preview.amountBs,
           accreditationType: preview.accreditationType,
           accreditedUsd: preview.accreditedUsd,
           accreditationRatePercent: preview.accreditationRatePercent,
           executedInvestmentVes: preview.amountBs,
           refundedVes: preview.refundedVes,
           accreditationConfirmedAt: timestamp,
-          status: 'usd_credited',
+          status: 'approved',
           statusHistory: [...purchase.statusHistory, historyEntry],
           execution: null,
         };
@@ -322,46 +383,106 @@ export const useAppStore = create<AppState>()(
         return updated;
       },
 
-      changePurchaseStatus: (id, nextStatus, note = '', realBinanceRate) => {
+      changePurchaseStatus: (id, nextStatus, note = '') => {
         const purchase = get().purchases.find((record) => record.id === id);
         if (!purchase) throw new Error('Compra no encontrada');
+        if (nextStatus === 'approved') {
+          throw new Error('Usa el registro de acreditación para aprobar la compra');
+        }
+        if (nextStatus === 'completed' || nextStatus === 'partial') {
+          throw new Error('El inventario se actualiza registrando ventas P2P');
+        }
         if (!canTransition(purchase.status, nextStatus)) {
           throw new Error('Transición de estado no permitida');
         }
-        if (nextStatus === 'completed' && realBinanceRate === undefined) {
-          throw new Error('La tasa real de venta es obligatoria');
-        }
 
-        const execution =
-          nextStatus === 'completed'
-            ? calculateExecution(purchase, realBinanceRate as number)
-            : purchase.execution;
+        const timestamp = new Date().toISOString();
         const trimmedNote = note.trim();
         const historyNote =
           trimmedNote ||
-          (nextStatus === 'completed'
-            ? `Venta real a ${formatRate(realBinanceRate as number)} Bs.S/USD`
+          (nextStatus === 'deposited_binance'
+            ? 'Fondos depositados en Binance'
             : '');
         const historyEntry: PurchaseRecord['statusHistory'][number] = {
           id: createId(),
-          timestamp: new Date().toISOString(),
+          timestamp,
           fromStatus: purchase.status,
           toStatus: nextStatus,
           note: historyNote,
         };
+        const updates: Partial<PurchaseRecord> = {
+          status: nextStatus,
+          statusHistory: [...purchase.statusHistory, historyEntry],
+        };
+
+        if (nextStatus === 'deposited_binance') {
+          const initialUsdt = round2(
+            (purchase.initialBinanceUsdt ?? 0) > 0
+              ? (purchase.initialBinanceUsdt as number)
+              : (purchase.usdDeposited ?? 0),
+          );
+          const executedCost = round2(
+            purchase.executedTotalCostVes ?? purchase.totalCostBs ?? purchase.amountBs,
+          );
+          if (initialUsdt <= 0) {
+            throw new Error('La compra no tiene USDT disponibles para depositar en Binance');
+          }
+          updates.fundedToBinanceAt = timestamp;
+          updates.initialBinanceUsdt = initialUsdt;
+          updates.unitCostInBinanceVes = round2(executedCost / initialUsdt);
+          updates.soldUsdt = 0;
+          updates.remainingBinanceUsdt = initialUsdt;
+          updates.allocatedCostVesTotal = 0;
+          updates.remainingCostVes = executedCost;
+          updates.realizedRevenueVes = 0;
+          updates.realizedProfitVes = 0;
+          updates.weightedAverageSellRateVes = 0;
+          updates.allocations = [];
+        }
 
         set((state) => ({
           purchases: state.purchases.map((record) =>
-            record.id === id
-              ? {
-                  ...record,
-                  status: nextStatus,
-                  statusHistory: [...record.statusHistory, historyEntry],
-                  execution,
-                }
-              : record,
+            record.id === id ? { ...record, ...updates } : record,
           ),
         }));
+      },
+
+      registerSale: (input) => {
+        const latestSaleTimestamp = get().sales.reduce(
+          (latest, sale) => Math.max(latest, Date.parse(sale.createdAt) || 0),
+          0,
+        );
+        const createdAt = new Date(
+          Math.max(Date.now(), latestSaleTimestamp + 1),
+        ).toISOString();
+        const draft: SaleRecord = {
+          id: createId(),
+          createdAt,
+          notes: input.notes ?? '',
+          totalUsdtSold: input.totalUsdtSold,
+          p2pFixedFeeUsdt: input.p2pFixedFeeUsdt ?? DEFAULT_P2P_FIXED_FEE_USDT,
+          netUsdtLiquidated: 0,
+          sellRateVes: input.sellRateVes,
+          totalVesReceived: 0,
+          totalAllocatedCostVes: 0,
+          totalRealizedProfitVes: 0,
+          realizedRoiPercent: 0,
+          walletBalanceAfterUsdt: 0,
+          allocations: [],
+        };
+
+        const result = reconcileFifoInventory(get().purchases, [...get().sales, draft]);
+        const sale = result.sales.find((record) => record.id === draft.id);
+        if (!sale) throw new Error('No fue posible registrar la venta FIFO');
+
+        set({ purchases: result.purchases, sales: result.sales });
+        return sale;
+      },
+
+      deleteSale: (id) => {
+        const sales = get().sales.filter((sale) => sale.id !== id);
+        const result = reconcileFifoInventory(get().purchases, sales);
+        set({ purchases: result.purchases, sales: result.sales });
       },
 
       updatePurchaseNotes: (id, notes) =>
@@ -371,8 +492,28 @@ export const useAppStore = create<AppState>()(
           ),
         })),
 
-      deletePurchase: (id) =>
-        set((state) => ({ purchases: state.purchases.filter((purchase) => purchase.id !== id) })),
+      deletePurchase: (id) => {
+        const purchase = get().purchases.find((record) => record.id === id);
+        if (!purchase) return;
+        const allocations = purchase.allocations ?? [];
+        const usedBySale = get().sales.some((sale) =>
+          sale.allocations.some((allocation) => allocation.purchaseId === id),
+        );
+        if (
+          usedBySale ||
+          allocations.length > 0 ||
+          (purchase.soldUsdt ?? 0) > 0 ||
+          purchase.status === 'partial' ||
+          purchase.status === 'completed'
+        ) {
+          throw new Error(
+            'No se puede eliminar una compra consumida por ventas. Elimina primero las ventas asociadas.',
+          );
+        }
+        set((state) => ({
+          purchases: state.purchases.filter((record) => record.id !== id),
+        }));
+      },
 
       setFilters: (patch) =>
         set((state) => ({ filters: { ...state.filters, ...patch } })),
@@ -421,6 +562,7 @@ export const useAppStore = create<AppState>()(
           rates: parsed.data.rates,
           profiles: parsed.data.profiles,
           purchases: parsed.data.purchases,
+          sales: parsed.data.sales,
           disclaimer: parsed.data.disclaimer,
           theme: parsed.data.theme,
           filters: { ...DEFAULT_FILTERS },
@@ -430,12 +572,14 @@ export const useAppStore = create<AppState>()(
     {
       name: 'calculadora-p2p',
       version: SCHEMA_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => appStorage),
+      skipHydration: true,
       partialize: (state) => ({
         schemaVersion: state.schemaVersion,
         rates: state.rates,
         profiles: state.profiles,
         purchases: state.purchases,
+        sales: state.sales,
         disclaimer: state.disclaimer,
         theme: state.theme,
       }),

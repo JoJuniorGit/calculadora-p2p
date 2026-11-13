@@ -187,12 +187,53 @@ export interface CalculationResult {
 
 export type PurchaseStatus =
   | 'pending'
+  | 'approved'
   | 'usd_credited'
   | 'deposited_binance'
+  | 'partial'
   | 'completed'
   | 'cancelled';
 
 export type AccreditationType = 'TOTAL' | 'PARTIAL';
+
+export interface SaleLotAllocation {
+  allocationId: string;
+  saleId: string;
+  purchaseId: string;
+  allocatedAt: string;
+  usdtTaken: number;
+  p2pFeeShareUsdt: number;
+  netUsdtSold: number;
+  sellRateVes: number;
+  allocatedCostVes: number;
+  allocatedRevenueVes: number;
+  allocatedProfitVes: number;
+  allocatedRoiPercent: number;
+  lotRemainingUsdtAfter: number;
+}
+
+export interface SaleRecord {
+  id: string;
+  createdAt: string;
+  notes: string;
+  totalUsdtSold: number;
+  p2pFixedFeeUsdt: number;
+  netUsdtLiquidated: number;
+  sellRateVes: number;
+  totalVesReceived: number;
+  totalAllocatedCostVes: number;
+  totalRealizedProfitVes: number;
+  realizedRoiPercent: number;
+  walletBalanceAfterUsdt: number;
+  allocations: SaleLotAllocation[];
+}
+
+export interface SaleInput {
+  totalUsdtSold: number;
+  sellRateVes: number;
+  p2pFixedFeeUsdt?: number;
+  notes?: string;
+}
 
 export interface StatusChangeMetadata {
   accreditationType?: AccreditationType;
@@ -222,9 +263,24 @@ export interface PurchaseExecution {
   closedAt: string;
 }
 
+export interface PurchaseRateReference {
+  source: 'historical' | 'manual';
+  bcvAsOf: string;
+  bcvForwardFilled: boolean;
+  binanceAsOf: string | null;
+  binanceMethod: 'median' | 'average' | 'manual';
+}
+
+export interface PurchaseRecordMetadata {
+  purchaseDate?: string;
+  rateReference?: PurchaseRateReference;
+}
+
 export interface PurchaseRecord {
   id: string;
   createdAt: string;
+  /** Local calendar date on which the purchase was made, independent of registration time. */
+  purchaseDate?: string;
   profileId: string;
   /** Profile name snapshot (kept if the profile is later deleted). */
   profileName: string;
@@ -234,6 +290,7 @@ export interface PurchaseRecord {
   amountBs: number;
   bcvRate: number;
   binanceRate: number;
+  rateReference?: PurchaseRateReference;
   snapshot: CalculationSnapshot;
   /** Executed USD bought at the bank (updated after a partial accreditation). */
   usdBought: number;
@@ -248,6 +305,24 @@ export interface PurchaseRecord {
   requestedInvestmentVes: number;
   /** Immutable USD originally requested from the bank (USD_1 theoretical). */
   requestedUsd: number;
+  /** Requested total cost in Bs.S (EN_ESPERA bucket). */
+  requestedTotalCostVes?: number;
+  /** Executed total cost in Bs.S after bank approval/accreditation. */
+  executedTotalCostVes?: number;
+  /** Timestamp of the transition to EN_BINANCE (FIFO ordering). */
+  fundedToBinanceAt?: string | null;
+  /** USDT net that entered the Binance wallet. */
+  initialBinanceUsdt?: number;
+  /** Real cost per USDT placed in Binance. */
+  unitCostInBinanceVes?: number;
+  soldUsdt?: number;
+  remainingBinanceUsdt?: number;
+  allocatedCostVesTotal?: number;
+  remainingCostVes?: number;
+  realizedRevenueVes?: number;
+  realizedProfitVes?: number;
+  weightedAverageSellRateVes?: number;
+  allocations?: SaleLotAllocation[];
   accreditationType: AccreditationType;
   /** USD actually approved by the bank on the confirmed accreditation. */
   accreditedUsd: number;
@@ -284,6 +359,7 @@ export interface PersistedState {
   rates: Rates;
   profiles: BankProfile[];
   purchases: PurchaseRecord[];
+  sales: SaleRecord[];
   disclaimer: DisclaimerConfig;
   theme: ThemeMode;
 }
@@ -300,4 +376,22 @@ export interface PurchaseKpis {
   weightedRoiPct: number;
   completedCount: number;
   cancelledCount: number;
+  /** New bucket: requested cost in EN_ESPERA + executed cost in APROBADO. */
+  capitalInTransitVes: number;
+  /** USD equivalent requested/approved in transit. */
+  capitalInTransitUsd: number;
+  /** New bucket: executed cost of ACREDITADO purchases liquid in the bank. */
+  capitalInBankVes: number;
+  /** USD equivalent of ACREDITADO capital in the bank. */
+  capitalInBankUsd: number;
+  /** New bucket: remaining cost of EN_BINANCE + EN_BINANCE_PARCIAL inventory. */
+  capitalInBinanceVes: number;
+  /** Remaining USDT held in Binance inventory. */
+  capitalInBinanceUsdt: number;
+  /** Realized profit from sales. */
+  realizedProfitVes: number;
+  /** Realized profit expressed in USDT at the sale rate. */
+  realizedProfitUsdt: number;
+  /** Weighted realized ROI: realized profit / sold cost. */
+  realizedRoiPct: number;
 }

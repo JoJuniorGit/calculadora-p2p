@@ -39,6 +39,30 @@ const arrayParams = {
   invalid_type_error: 'Debe ser una lista',
 };
 
+function isValidDateOnly(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(0);
+  date.setFullYear(year, month - 1, day);
+  date.setHours(12, 0, 0, 0);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+const dateOnlyText = requiredText
+  .regex(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'La fecha debe tener el formato AAAA-MM-DD',
+  })
+  .refine(isValidDateOnly, { message: 'La fecha no es válida' });
+
 export const rateQuoteSchema = z.object(
   {
     value: nonNegativeNumber,
@@ -146,7 +170,7 @@ export const calculationSnapshotSchema = z.object(
 );
 
 export const purchaseStatusSchema = z.enum(
-  ['pending', 'usd_credited', 'deposited_binance', 'completed', 'cancelled'],
+  ['pending', 'approved', 'usd_credited', 'deposited_binance', 'partial', 'completed', 'cancelled'],
   { errorMap: enumErrorMap },
 );
 
@@ -193,11 +217,62 @@ export const purchaseExecutionSchema = z.object(
   objectParams,
 );
 
+export const purchaseRateReferenceSchema = z.object(
+  {
+    source: z.enum(['historical', 'manual'], { errorMap: enumErrorMap }),
+    bcvAsOf: requiredText,
+    bcvForwardFilled: requiredBoolean,
+    binanceAsOf: requiredText.nullable(),
+    binanceMethod: z.enum(['median', 'average', 'manual'], { errorMap: enumErrorMap }),
+  },
+  objectParams,
+);
+
+export const saleLotAllocationSchema = z.object(
+  {
+    allocationId: requiredText.min(1, { message: 'El identificador es obligatorio' }),
+    saleId: requiredText.min(1, { message: 'El identificador es obligatorio' }),
+    purchaseId: requiredText.min(1, { message: 'El identificador es obligatorio' }),
+    allocatedAt: requiredText,
+    usdtTaken: positiveNumber,
+    p2pFeeShareUsdt: nonNegativeNumber,
+    netUsdtSold: nonNegativeNumber,
+    sellRateVes: positiveNumber,
+    allocatedCostVes: nonNegativeNumber,
+    allocatedRevenueVes: nonNegativeNumber,
+    allocatedProfitVes: finiteNumber,
+    allocatedRoiPercent: finiteNumber,
+    lotRemainingUsdtAfter: nonNegativeNumber,
+  },
+  objectParams,
+);
+
+export const saleRecordSchema = z.object(
+  {
+    id: requiredText.min(1, { message: 'El identificador es obligatorio' }),
+    createdAt: requiredText,
+    notes: requiredText,
+    totalUsdtSold: positiveNumber,
+    p2pFixedFeeUsdt: nonNegativeNumber,
+    netUsdtLiquidated: nonNegativeNumber,
+    sellRateVes: positiveNumber,
+    totalVesReceived: nonNegativeNumber,
+    totalAllocatedCostVes: nonNegativeNumber,
+    totalRealizedProfitVes: finiteNumber,
+    realizedRoiPercent: finiteNumber,
+    walletBalanceAfterUsdt: nonNegativeNumber,
+    allocations: z.array(saleLotAllocationSchema, arrayParams),
+  },
+  objectParams,
+);
+
 export const purchaseRecordSchema = z
   .object(
     {
       id: requiredText.min(1, { message: 'El identificador es obligatorio' }),
       createdAt: requiredText,
+      purchaseDate: dateOnlyText.optional(),
+      rateReference: purchaseRateReferenceSchema.optional(),
       profileId: requiredText.min(1, { message: 'El identificador es obligatorio' }),
       profileName: requiredText.min(1, { message: 'El nombre del banco es obligatorio' }),
       mode: z.enum(['bs', 'usd'], { errorMap: enumErrorMap }),
@@ -216,6 +291,19 @@ export const purchaseRecordSchema = z
       breakEvenRate: positiveNumber,
       requestedInvestmentVes: positiveNumber,
       requestedUsd: positiveNumber,
+      requestedTotalCostVes: nonNegativeNumber.optional(),
+      executedTotalCostVes: nonNegativeNumber.optional(),
+      fundedToBinanceAt: requiredText.nullable().optional(),
+      initialBinanceUsdt: nonNegativeNumber.optional(),
+      unitCostInBinanceVes: nonNegativeNumber.optional(),
+      soldUsdt: nonNegativeNumber.optional(),
+      remainingBinanceUsdt: nonNegativeNumber.optional(),
+      allocatedCostVesTotal: nonNegativeNumber.optional(),
+      remainingCostVes: nonNegativeNumber.optional(),
+      realizedRevenueVes: nonNegativeNumber.optional(),
+      realizedProfitVes: finiteNumber.optional(),
+      weightedAverageSellRateVes: nonNegativeNumber.optional(),
+      allocations: z.array(saleLotAllocationSchema, arrayParams).optional(),
       accreditationType: accreditationTypeSchema,
       accreditedUsd: positiveNumber,
       accreditationRatePercent: percentageNumber,
@@ -259,7 +347,16 @@ export const purchaseRecordSchema = z
 export const purchaseFiltersSchema = z.object(
   {
     status: z.enum(
-      ['pending', 'usd_credited', 'deposited_binance', 'completed', 'cancelled', 'all'],
+      [
+        'pending',
+        'approved',
+        'usd_credited',
+        'deposited_binance',
+        'partial',
+        'completed',
+        'cancelled',
+        'all',
+      ],
       { errorMap: enumErrorMap },
     ),
     profileName: requiredText,
@@ -285,6 +382,7 @@ export const persistedStateSchema = z.object(
     rates: ratesSchema,
     profiles: z.array(bankProfileSchema, arrayParams),
     purchases: z.array(purchaseRecordSchema, arrayParams),
+    sales: z.array(saleRecordSchema, arrayParams).default([]),
     disclaimer: disclaimerSchema,
     theme: themeSchema,
   },
@@ -397,6 +495,9 @@ export type AccreditationTypeData = z.infer<typeof accreditationTypeSchema>;
 export type StatusChangeData = z.infer<typeof statusChangeSchema>;
 export type StatusChangeMetadataData = z.infer<typeof statusChangeMetadataSchema>;
 export type PurchaseExecutionData = z.infer<typeof purchaseExecutionSchema>;
+export type PurchaseRateReferenceData = z.infer<typeof purchaseRateReferenceSchema>;
+export type SaleLotAllocationData = z.infer<typeof saleLotAllocationSchema>;
+export type SaleRecordData = z.infer<typeof saleRecordSchema>;
 export type PurchaseRecordData = z.infer<typeof purchaseRecordSchema>;
 export type PurchaseFiltersData = z.infer<typeof purchaseFiltersSchema>;
 export type DisclaimerData = z.infer<typeof disclaimerSchema>;

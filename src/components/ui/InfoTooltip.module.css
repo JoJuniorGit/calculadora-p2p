@@ -72,9 +72,25 @@
     visibility 120ms ease;
 }
 
+.tooltipStart {
+  left: 0;
+  right: auto;
+}
+
+.tooltipCenter {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -0.2rem);
+}
+
 .root:hover .tooltip,
 .root:focus-within .tooltip {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
+}
+
+.root:hover .tooltipCenter,
+.root:focus-within .tooltipCenter {
+  transform: translate(-50%, 0);
 }

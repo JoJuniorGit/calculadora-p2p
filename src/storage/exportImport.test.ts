@@ -160,6 +160,7 @@ function createPersistedState(): PersistedState {
     },
     profiles: [profile],
     purchases: [createPurchase()],
+    sales: [],
     disclaimer: { enabled: false, text: 'Aviso de simulación para pruebas.' },
     theme: 'light',
   };
@@ -210,6 +211,22 @@ describe('purchase CSV exports', () => {
     const csv = createPurchasesCsvExport([purchase]);
 
     expect(csv.startsWith('# schemaVersion=1\r\n')).toBe(true);
+    expect(parsePurchasesCsv(csv)).toEqual({ ok: true, data: [purchase] });
+  });
+
+  it('round-trips historical purchase date and rate source', () => {
+    const purchase = createPurchase('purchase-historical', {
+      purchaseDate: '2026-11-10',
+      rateReference: {
+        source: 'historical',
+        bcvAsOf: '2026-11-10T00:00:00.000Z',
+        bcvForwardFilled: false,
+        binanceAsOf: '2026-11-10T16:00:00.000Z',
+        binanceMethod: 'median',
+      },
+    });
+    const csv = createPurchasesCsvExport([purchase]);
+
     expect(parsePurchasesCsv(csv)).toEqual({ ok: true, data: [purchase] });
   });
 

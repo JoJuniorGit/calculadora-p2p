@@ -43,10 +43,12 @@ export function filterPurchases(
     }
 
     if (dateFrom !== null || dateToExclusive !== null) {
-      const createdAt = Date.parse(purchase.createdAt);
-      if (!Number.isFinite(createdAt)) return false;
-      if (dateFrom !== null && createdAt < dateFrom) return false;
-      if (dateToExclusive !== null && createdAt >= dateToExclusive) return false;
+      const purchaseTimestamp = purchase.purchaseDate
+        ? getLocalDayBoundary(purchase.purchaseDate)
+        : Date.parse(purchase.createdAt);
+      if (purchaseTimestamp === null || !Number.isFinite(purchaseTimestamp)) return false;
+      if (dateFrom !== null && purchaseTimestamp < dateFrom) return false;
+      if (dateToExclusive !== null && purchaseTimestamp >= dateToExclusive) return false;
     }
 
     return true;

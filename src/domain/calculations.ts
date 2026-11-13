@@ -10,6 +10,10 @@ import type {
   IgtfBase,
   Profitability,
   PurchaseRecord,
+  PurchaseStatus,
+  SaleInput,
+  SaleLotAllocation,
+  SaleRecord,
   WaterfallLine,
 } from './types';
 
@@ -17,6 +21,7 @@ export const INTERVENTION_PCT = 0.5;
 export const PROFITABILITY_GREEN_MIN_PCT = 3;
 export const PROFITABILITY_YELLOW_MIN_PCT = 0;
 export const ABNORMAL_GAP_PCT = 50;
+export const DEFAULT_P2P_FIXED_FEE_USDT = 0.06;
 
 export interface ExchangeGap {
   /** Gap percentage measured against the effective BCV rate. */
@@ -190,10 +195,7 @@ function estimateBaseForTotal(totalCost: number, context: CalculationContext): n
     ? context.profile.igtfPct / 100
     : 0;
 
-  const interbankCoefficient =
-    context.profile.interbankBase === 'initial'
-      ? interbank
-      : (1 + intervention) * interbank;
+  const interbankCoefficient = (1 + intervention) * interbank;
 
   const igtfCoefficient =
     context.options.igtfEnabled && context.profile.igtfBase === 'investment'
@@ -264,16 +266,19 @@ function calculateDownstream(
   const binancePercentFeeUsd = round2(
     usdForBinance * (profile.binanceDepositPct / 100),
   );
-  const binanceFixedFeeUsd = round2(positiveModifier(profile.binanceDepositFixedUsd));
+  const binanceFixedFeeUsd = round2(
+    Math.max(
+      positiveModifier(profile.binanceDepositFixedUsd),
+      DEFAULT_P2P_FIXED_FEE_USDT,
+    ),
+  );
   const binanceFeeUsd = round2(binancePercentFeeUsd + binanceFixedFeeUsd);
 
   const interbankCostBs = options.interbankEnabled
     ? sunkInterbankCostBs !== undefined
       ? round2(sunkInterbankCostBs)
       : round2(
-          (profile.interbankBase === 'initial'
-            ? base.baseBs
-            : round2(base.baseBs + base.interventionFeeBs)) *
+          round2(base.baseBs + base.interventionFeeBs) *
             (profile.interbankPct / 100),
         )
     : 0;
@@ -627,7 +632,7 @@ export function calculate(input: CalculationInput): CalculationResult {
     cardCommissionUsd: downstream.cardCommissionUsd,
     cardCommissionBs: downstream.cardCommissionBs,
     binanceDepositPct: input.profile.binanceDepositPct,
-    binanceDepositFixedUsd: input.profile.binanceDepositFixedUsd,
+    binanceDepositFixedUsd: downstream.binanceFixedFeeUsd,
     binanceDepositUsd: downstream.binancePercentFeeUsd,
     binancePercentFeeUsd: downstream.binancePercentFeeUsd,
     binanceFixedDiscountBs: downstream.binanceFixedDiscountBs,
@@ -712,4 +717,405 @@ export function recalculateAccreditation(
   result.waterfall = createWaterfall(context, result);
 
   return result;
+}
+
+export interface FifoInventoryResult {
+  purchases: PurchaseRecord[];
+  sales: SaleRecord[];
+}
+
+export interface FifoSalePreview extends FifoInventoryResult {
+  preview: SaleRecord;
+}
+
+const BINANCE_INVENTORY_STATUSES: PurchaseStatus[] = [
+  'deposited_binance',
+  'partial',
+  'completed',
+];
+
+function hasBinanceInventory(purchase: PurchaseRecord): boolean {
+  return (
+    BINANCE_INVENTORY_STATUSES.includes(purchase.status) &&
+    Math.max(purchase.initialBinanceUsdt ?? 0, purchase.usdDeposited ?? 0) > 0
+  );
+}
+
+function inventoryInitialUsdt(purchase: PurchaseRecord): number {
+  if ((purchase.initialBinanceUsdt ?? 0) > 0) {
+    return round2(Math.max(0, purchase.initialBinanceUsdt as number));
+  }
+
+  return round2(Math.max(0, purchase.usdDeposited ?? 0));
+}
+
+function inventoryExecutedCostVes(purchase: PurchaseRecord): number {
+  return round2(
+    Math.max(
+      0,
+      purchase.executedTotalCostVes ??
+        purchase.totalCostBs ??
+        purchase.amountBs ??
+        purchase.requestedInvestmentVes ??
+        0,
+    ),
+  );
+}
+
+function fundedTimestamp(purchase: PurchaseRecord): string {
+  return purchase.fundedToBinanceAt ?? purchase.createdAt;
+}
+
+function timestampValue(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * Resets a purchase to its inventory baseline before replaying sales. Dates are
+ * kept stable so the FIFO order is deterministic. Legacy fully-completed
+ * purchases without allocations remain closed and are not reopened by a sale.
+ */
+function prepareInventoryPurchase(purchase: PurchaseRecord): PurchaseRecord {
+  const requestedTotalCostVes = round2(
+    purchase.requestedTotalCostVes ??
+      purchase.requestedInvestmentVes ??
+      purchase.amountBs ??
+      0,
+  );
+  const executedTotalCostVes = inventoryExecutedCostVes(purchase);
+  const initialUsdt = inventoryInitialUsdt(purchase);
+  const unitCostInBinanceVes =
+    initialUsdt > 0 ? round2(executedTotalCostVes / initialUsdt) : 0;
+  const fundedToBinanceAt = hasBinanceInventory(purchase)
+    ? fundedTimestamp(purchase)
+    : null;
+  const hasAllocations = (purchase.allocations?.length ?? 0) > 0;
+  const legacyClosed =
+    purchase.status === 'completed' && !hasAllocations && initialUsdt > 0;
+
+  if (legacyClosed) {
+    const soldUsdt = round2(Math.min(initialUsdt, purchase.soldUsdt ?? initialUsdt));
+    const realizedRevenueVes = round2(
+      purchase.realizedRevenueVes ??
+        purchase.execution?.executedBsOut ??
+        purchase.estimatedBsOut ??
+        0,
+    );
+    const realizedProfitVes = round2(
+      purchase.realizedProfitVes ??
+        purchase.execution?.executedProfitBs ??
+        purchase.estimatedProfitBs ??
+        0,
+    );
+
+    return {
+      ...purchase,
+      requestedTotalCostVes,
+      executedTotalCostVes,
+      fundedToBinanceAt,
+      initialBinanceUsdt: initialUsdt,
+      unitCostInBinanceVes,
+      soldUsdt,
+      remainingBinanceUsdt: 0,
+      allocatedCostVesTotal: executedTotalCostVes,
+      remainingCostVes: 0,
+      realizedRevenueVes,
+      realizedProfitVes,
+      weightedAverageSellRateVes: round2(
+        purchase.weightedAverageSellRateVes ??
+          purchase.execution?.realBinanceRate ??
+          0,
+      ),
+      allocations: [],
+    };
+  }
+
+  if (hasBinanceInventory(purchase) && initialUsdt > 0) {
+    return {
+      ...purchase,
+      requestedTotalCostVes,
+      executedTotalCostVes,
+      fundedToBinanceAt,
+      initialBinanceUsdt: initialUsdt,
+      unitCostInBinanceVes,
+      soldUsdt: 0,
+      remainingBinanceUsdt: initialUsdt,
+      allocatedCostVesTotal: 0,
+      remainingCostVes: executedTotalCostVes,
+      realizedRevenueVes: 0,
+      realizedProfitVes: 0,
+      weightedAverageSellRateVes: 0,
+      allocations: [],
+      status: 'deposited_binance',
+    };
+  }
+
+  return {
+    ...purchase,
+    requestedTotalCostVes,
+    executedTotalCostVes,
+    fundedToBinanceAt,
+    initialBinanceUsdt: 0,
+    unitCostInBinanceVes: 0,
+    soldUsdt: 0,
+    remainingBinanceUsdt: 0,
+    allocatedCostVesTotal: 0,
+    remainingCostVes: 0,
+    realizedRevenueVes: 0,
+    realizedProfitVes: 0,
+    weightedAverageSellRateVes: 0,
+    allocations: [],
+  };
+}
+
+function sortEligibleLots(purchases: PurchaseRecord[]): PurchaseRecord[] {
+  return purchases
+    .filter(
+      (purchase) =>
+        (purchase.status === 'deposited_binance' || purchase.status === 'partial') &&
+        (purchase.remainingBinanceUsdt ?? 0) > 0,
+    )
+    .sort((left, right) => {
+      const fundedDifference =
+        timestampValue(fundedTimestamp(left)) - timestampValue(fundedTimestamp(right));
+      if (fundedDifference !== 0) return fundedDifference;
+
+      const createdDifference =
+        timestampValue(left.createdAt) - timestampValue(right.createdAt);
+      if (createdDifference !== 0) return createdDifference;
+
+      return left.id.localeCompare(right.id);
+    });
+}
+
+function saleSort(left: SaleRecord, right: SaleRecord): number {
+  const difference =
+    timestampValue(left.createdAt) - timestampValue(right.createdAt);
+  return difference !== 0 ? difference : left.id.localeCompare(right.id);
+}
+
+/**
+ * Rebuilds the Binance inventory and every FIFO allocation from the original
+ * purchases and the sale journal. The function is pure: it never mutates its
+ * arguments and always returns new arrays/objects.
+ */
+export function reconcileFifoInventory(
+  purchases: PurchaseRecord[],
+  sales: SaleRecord[],
+): FifoInventoryResult {
+  const reconciledPurchases = purchases.map(prepareInventoryPurchase);
+  const orderedSales = [...sales].sort(saleSort);
+  const processedSales: SaleRecord[] = [];
+
+  for (const sale of orderedSales) {
+    const totalUsdtSold = round2(sale.totalUsdtSold);
+    const p2pFixedFeeUsdt = round2(
+      sale.p2pFixedFeeUsdt ?? DEFAULT_P2P_FIXED_FEE_USDT,
+    );
+    const sellRateVes = sale.sellRateVes;
+
+    if (!Number.isFinite(totalUsdtSold) || totalUsdtSold <= 0) {
+      throw new Error('El monto de la venta debe ser mayor que 0');
+    }
+    if (!Number.isFinite(sellRateVes) || sellRateVes <= 0) {
+      throw new Error('La tasa de venta debe ser mayor que 0');
+    }
+    if (!Number.isFinite(p2pFixedFeeUsdt) || p2pFixedFeeUsdt < 0) {
+      throw new Error('La comisión fija P2P no puede ser negativa');
+    }
+    if (p2pFixedFeeUsdt >= totalUsdtSold) {
+      throw new Error('La comisión fija P2P debe ser menor que el monto vendido');
+    }
+
+    const eligibleLots = sortEligibleLots(reconciledPurchases);
+    const availableUsdt = round2(
+      eligibleLots.reduce(
+        (total, purchase) => total + (purchase.remainingBinanceUsdt ?? 0),
+        0,
+      ),
+    );
+
+    if (availableUsdt < totalUsdtSold) {
+      throw new Error(
+        `Saldo insuficiente en Binance: disponible ${availableUsdt.toFixed(2)} USDT`,
+      );
+    }
+
+    let neededUsdt = totalUsdtSold;
+    const consumed: Array<{
+      purchase: PurchaseRecord;
+      usdtTaken: number;
+      allocatedCostVes: number;
+    }> = [];
+
+    while (neededUsdt > 0.0000001) {
+      const lot = eligibleLots.find(
+        (purchase) => (purchase.remainingBinanceUsdt ?? 0) > 0,
+      );
+      if (!lot) {
+        throw new Error('Saldo insuficiente en Binance para completar la venta');
+      }
+
+      const previousRemaining = round2(lot.remainingBinanceUsdt ?? 0);
+      const previousCost = round2(lot.remainingCostVes ?? 0);
+      const usdtTaken = round2(Math.min(previousRemaining, neededUsdt));
+      if (usdtTaken <= 0) {
+        throw new Error('El monto de la venta no puede consumir un lote con saldo cero');
+      }
+
+      lot.remainingBinanceUsdt = round2(previousRemaining - usdtTaken);
+      lot.soldUsdt = round2((lot.soldUsdt ?? 0) + usdtTaken);
+      const allocatedCostVes =
+        lot.remainingBinanceUsdt === 0
+          ? previousCost
+          : round2(previousCost * (usdtTaken / previousRemaining));
+      lot.allocatedCostVesTotal = round2(
+        (lot.allocatedCostVesTotal ?? 0) + allocatedCostVes,
+      );
+      lot.remainingCostVes =
+        lot.remainingBinanceUsdt === 0
+          ? 0
+          : round2(previousCost - allocatedCostVes);
+      lot.status =
+        lot.remainingBinanceUsdt === 0 ? 'completed' : 'partial';
+
+      consumed.push({ purchase: lot, usdtTaken, allocatedCostVes });
+      neededUsdt = round2(neededUsdt - usdtTaken);
+    }
+
+    const totalVesReceived = round2(
+      (totalUsdtSold - p2pFixedFeeUsdt) * sellRateVes,
+    );
+    let allocatedRevenue = 0;
+    let allocatedFee = 0;
+    const allocations: SaleLotAllocation[] = [];
+
+    consumed.forEach((part, index) => {
+      const isLast = index === consumed.length - 1;
+      const weight = part.usdtTaken / totalUsdtSold;
+      const p2pFeeShareUsdt = isLast
+        ? round2(p2pFixedFeeUsdt - allocatedFee)
+        : round2(p2pFixedFeeUsdt * weight);
+      const allocatedRevenueVes = isLast
+        ? round2(totalVesReceived - allocatedRevenue)
+        : round2(totalVesReceived * weight);
+      const netUsdtSold = round2(part.usdtTaken - p2pFeeShareUsdt);
+      const allocatedProfitVes = round2(
+        allocatedRevenueVes - part.allocatedCostVes,
+      );
+      const allocatedRoiPercent =
+        part.allocatedCostVes > 0
+          ? (allocatedProfitVes / part.allocatedCostVes) * 100
+          : 0;
+      const allocation: SaleLotAllocation = {
+        allocationId: `${sale.id}:${part.purchase.id}`,
+        saleId: sale.id,
+        purchaseId: part.purchase.id,
+        allocatedAt: sale.createdAt,
+        usdtTaken: part.usdtTaken,
+        p2pFeeShareUsdt,
+        netUsdtSold,
+        sellRateVes,
+        allocatedCostVes: part.allocatedCostVes,
+        allocatedRevenueVes,
+        allocatedProfitVes,
+        allocatedRoiPercent,
+        lotRemainingUsdtAfter: part.purchase.remainingBinanceUsdt ?? 0,
+      };
+
+      part.purchase.allocations = [
+        ...(part.purchase.allocations ?? []),
+        allocation,
+      ];
+      part.purchase.realizedRevenueVes = round2(
+        (part.purchase.realizedRevenueVes ?? 0) + allocatedRevenueVes,
+      );
+      part.purchase.realizedProfitVes = round2(
+        (part.purchase.realizedProfitVes ?? 0) + allocatedProfitVes,
+      );
+      const soldUsdt = round2(part.purchase.soldUsdt ?? 0);
+      const weightedValue =
+        soldUsdt > 0
+          ? (part.purchase.allocations ?? []).reduce(
+              (total, item) => total + item.usdtTaken * item.sellRateVes,
+              0,
+            ) / soldUsdt
+          : 0;
+      part.purchase.weightedAverageSellRateVes = round2(weightedValue);
+      allocations.push(allocation);
+      allocatedRevenue = round2(allocatedRevenue + allocatedRevenueVes);
+      allocatedFee = round2(allocatedFee + p2pFeeShareUsdt);
+    });
+
+    const totalAllocatedCostVes = round2(
+      allocations.reduce((total, allocation) => total + allocation.allocatedCostVes, 0),
+    );
+    const totalRealizedProfitVes = round2(
+      totalVesReceived - totalAllocatedCostVes,
+    );
+    const realizedRoiPercent =
+      totalAllocatedCostVes > 0
+        ? (totalRealizedProfitVes / totalAllocatedCostVes) * 100
+        : 0;
+    const walletBalanceAfterUsdt = round2(
+      reconciledPurchases.reduce(
+        (total, purchase) => total + (purchase.remainingBinanceUsdt ?? 0),
+        0,
+      ),
+    );
+
+    processedSales.push({
+      ...sale,
+      totalUsdtSold,
+      p2pFixedFeeUsdt,
+      netUsdtLiquidated: round2(totalUsdtSold - p2pFixedFeeUsdt),
+      sellRateVes,
+      totalVesReceived,
+      totalAllocatedCostVes,
+      totalRealizedProfitVes,
+      realizedRoiPercent,
+      walletBalanceAfterUsdt,
+      allocations,
+    });
+  }
+
+  return { purchases: reconciledPurchases, sales: processedSales };
+}
+
+/** Builds a non-persisted synthetic sale to preview FIFO consumption in the UI. */
+export function previewFifoSale(
+  purchases: PurchaseRecord[],
+  sales: SaleRecord[],
+  input: SaleInput,
+): FifoSalePreview {
+  const latestSaleTimestamp = sales.reduce(
+    (latest, sale) => Math.max(latest, timestampValue(sale.createdAt)),
+    0,
+  );
+  const createdAt = new Date(
+    Math.max(Date.now(), latestSaleTimestamp + 1),
+  ).toISOString();
+  const draft: SaleRecord = {
+    id: '__preview__',
+    createdAt,
+    notes: input.notes ?? '',
+    totalUsdtSold: input.totalUsdtSold,
+    p2pFixedFeeUsdt: input.p2pFixedFeeUsdt ?? DEFAULT_P2P_FIXED_FEE_USDT,
+    netUsdtLiquidated: 0,
+    sellRateVes: input.sellRateVes,
+    totalVesReceived: 0,
+    totalAllocatedCostVes: 0,
+    totalRealizedProfitVes: 0,
+    realizedRoiPercent: 0,
+    walletBalanceAfterUsdt: 0,
+    allocations: [],
+  };
+  const result = reconcileFifoInventory(purchases, [...sales, draft]);
+  const preview = result.sales.find((sale) => sale.id === '__preview__');
+  if (!preview) {
+    throw new Error('No fue posible simular la venta FIFO');
+  }
+
+  return { ...result, preview };
 }

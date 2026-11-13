@@ -3,24 +3,30 @@ import { round2 } from './calculations';
 
 export const PURCHASE_STATUS_ORDER: PurchaseStatus[] = [
   'pending',
+  'approved',
   'usd_credited',
   'deposited_binance',
+  'partial',
   'completed',
   'cancelled',
 ];
 
 export const PURCHASE_STATUS_LABELS: Record<PurchaseStatus, string> = {
-  pending: 'Pendiente',
-  usd_credited: 'Divisas acreditadas',
-  deposited_binance: 'Depositado a Binance',
-  completed: 'Vendido/Completado',
+  pending: 'En espera',
+  approved: 'Aprobado',
+  usd_credited: 'Acreditado',
+  deposited_binance: 'En Binance',
+  partial: 'Parcial',
+  completed: 'Completo',
   cancelled: 'Cancelado',
 };
 
 const nextStatuses: Record<PurchaseStatus, PurchaseStatus[]> = {
-  pending: ['usd_credited', 'cancelled'],
+  pending: ['approved', 'cancelled'],
+  approved: ['usd_credited', 'cancelled'],
   usd_credited: ['deposited_binance', 'cancelled'],
-  deposited_binance: ['completed', 'cancelled'],
+  deposited_binance: [],
+  partial: [],
   completed: [],
   cancelled: [],
 };

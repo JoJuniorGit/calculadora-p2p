@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { round2 } from '../../domain/calculations';
 import type { BankProfile, CalculationInput } from '../../domain/types';
 import { useAppStore } from '../../store/useAppStore';
-import { toInputNumber } from '../../utils/format';
 import { PurchaseAccreditationModal } from './PurchaseAccreditationModal';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -70,6 +69,10 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   });
 }
 
+function toAtmDigits(value: number): string {
+  return String(Math.round(value * 100));
+}
+
 function clickButton(text: string): void {
   const button = [...container.querySelectorAll('button')].find(
     (candidate) => candidate.textContent?.trim() === text,
@@ -89,6 +92,7 @@ beforeEach(() => {
     },
     profiles: [],
     purchases: [],
+    sales: [],
     filters: { status: 'all', profileName: 'all', dateFrom: '', dateTo: '' },
     disclaimer: { enabled: false, text: 'Aviso de prueba.' },
     theme: 'light',
@@ -124,7 +128,7 @@ describe('PurchaseAccreditationModal', () => {
 
     const updated = useAppStore.getState().purchases[0];
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(updated.status).toBe('usd_credited');
+    expect(updated.status).toBe('approved');
     expect(updated.accreditationType).toBe('TOTAL');
     expect(updated.accreditedUsd).toBe(requestedUsd);
     expect(updated.amountBs).toBe(updated.requestedInvestmentVes);
@@ -139,7 +143,7 @@ describe('PurchaseAccreditationModal', () => {
     );
     expect(input).not.toBeNull();
 
-    setInputValue(input as HTMLInputElement, String(requestedUsd + 1));
+    setInputValue(input as HTMLInputElement, toAtmDigits(requestedUsd + 1));
     expect(container.textContent).toContain('No puede superar los USD solicitados');
     const confirm = [...container.querySelectorAll('button')].find(
       (button) => button.textContent?.trim() === 'Confirmar acreditación',
@@ -147,7 +151,7 @@ describe('PurchaseAccreditationModal', () => {
     expect(confirm.disabled).toBe(true);
 
     const half = round2(requestedUsd / 2);
-    setInputValue(input as HTMLInputElement, toInputNumber(half));
+    setInputValue(input as HTMLInputElement, toAtmDigits(half));
     expect(container.textContent).toContain('50,00% de lo solicitado');
     expect(container.textContent).toContain('Bs.S liberados');
 
@@ -196,7 +200,7 @@ describe('PurchaseAccreditationModal', () => {
     const input = container.querySelector<HTMLInputElement>(
       'input[name="accredited-usd"]',
     );
-    setInputValue(input as HTMLInputElement, toInputNumber(round2(record.requestedUsd / 2)));
+    setInputValue(input as HTMLInputElement, toAtmDigits(round2(record.requestedUsd / 2)));
     act(() => {
       toggle?.click();
     });

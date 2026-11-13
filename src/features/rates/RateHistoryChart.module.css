@@ -1,0 +1,349 @@
+.card {
+  min-width: 0;
+}
+
+.rangeSelector {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.rangeButton,
+.modeButton {
+  min-height: 30px;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.rangeButton:hover,
+.modeButton:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.rangeButtonActive,
+.modeButtonActive {
+  border-color: var(--primary-glow);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.modeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+  margin-bottom: 0.7rem;
+}
+
+.modeSelector {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.sourceNote {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.chartWrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+}
+
+.gridLine {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.axisLabel {
+  fill: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gapAxisLabel {
+  fill: var(--success);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.p2pLine {
+  stroke: var(--primary);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gapLine {
+  stroke: var(--success);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bcvLine {
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.8;
+}
+
+.bcvMarker {
+  fill: var(--text-muted);
+  stroke: var(--bg-elevated);
+  stroke-width: 1.5;
+}
+
+.rangeBand {
+  fill: var(--primary-soft);
+  opacity: 0.7;
+}
+
+.p2pMarker {
+  fill: var(--primary);
+  stroke: var(--bg-elevated);
+  stroke-width: 1.5;
+}
+
+.openMarker {
+  fill: var(--bg-elevated);
+  stroke: var(--primary);
+  stroke-width: 1.5;
+}
+
+.gapMarker {
+  fill: var(--success);
+  stroke: var(--bg-elevated);
+  stroke-width: 1.5;
+}
+
+.hitArea {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.breakEvenLine {
+  stroke: var(--warning);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 4;
+}
+
+.breakEvenMarker {
+  fill: var(--warning);
+  stroke: var(--bg-elevated);
+  stroke-width: 1.5;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.9rem;
+  min-width: 0;
+  margin-top: 0.65rem;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.legendHint {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.p2pSwatch,
+.bcvSwatch,
+.openSwatch,
+.rangeSwatch,
+.breakEvenSwatch,
+.gapSwatch {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.gapSwatch {
+  width: 1rem;
+  height: 2px;
+  background: var(--success);
+}
+
+.p2pSwatch {
+  width: 1rem;
+  height: 2px;
+  background: var(--primary);
+}
+
+.bcvSwatch {
+  width: 1rem;
+  height: 2px;
+  background: var(--text-muted);
+}
+
+.openSwatch {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1.5px solid var(--primary);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.rangeSwatch {
+  width: 1rem;
+  height: 0.65rem;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-glow);
+}
+
+.breakEvenSwatch {
+  width: 1rem;
+  height: 0;
+  border-top: 2px dashed var(--warning);
+}
+
+.stateMessage {
+  margin: 0;
+  padding: 0.8rem 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.errorBox {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+  padding: 0.8rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.errorBox p {
+  margin: 0;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .modeRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chart {
+    min-width: 560px;
+  }
+}
+
+.purchasePin {
+  fill: #3b82f6;
+  stroke: var(--bg-elevated);
+  stroke-width: 1;
+}
+
+.salePin {
+  fill: var(--success);
+  stroke: var(--bg-elevated);
+  stroke-width: 1.5;
+}
+
+.purchaseSwatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-right: 0.32rem solid transparent;
+  border-bottom: 0.58rem solid #3b82f6;
+  border-left: 0.32rem solid transparent;
+}
+
+.saleSwatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.chartWrap {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.chartScrollHint {
+  display: none;
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.chartScrollHintVisible {
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .chart {
+    min-width: 520px;
+  }
+
+  .chartScrollHint {
+    display: block;
+  }
+
+  .modeRow {
+    gap: 0.5rem;
+  }
+
+  .rangeSelector {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rangeButton {
+    flex: 1 1 auto;
+    min-height: 38px;
+  }
+
+  .legend {
+    gap: 0.5rem 0.7rem;
+  }
+}

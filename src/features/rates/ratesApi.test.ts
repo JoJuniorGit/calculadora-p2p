@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchBinanceRate } from './ratesApi';
+import {
+  fetchBinanceRate,
+  fetchBinanceRateHistorySince,
+  fetchHistoricalRateForDate,
+  fetchRateHistory,
+  HistoricalRateLookupError,
+} from './ratesApi';
 
 function jsonResponse(payload: unknown): Response {
   return {
@@ -11,6 +17,7 @@ function jsonResponse(payload: unknown): Response {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('fetchBinanceRate', () => {
@@ -39,5 +46,245 @@ describe('fetchBinanceRate', () => {
     });
     expect(rate.value).toBe(100);
     expect(rate.provider).toContain('Binance');
+    expect(rate.provider.toLowerCase()).not.toContain('proxy');
+  });
+
+  it('parses the CORS-enabled P2P history and official BCV history', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/history/binance')) {
+        return Promise.resolve(
+          jsonResponse({
+            currencies: [
+              {
+                date: '2026-11-11T08:00:00Z',
+                median_price: 1079.999,
+                average_price: 1082.337857,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.resolve(
+        jsonResponse([
+          {
+            fecha: '2026-11-11',
+            promedio: 901.6175,
+          },
+        ]),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const history = await fetchRateHistory(7);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(urls.some((url) => url.includes('/history/binance'))).toBe(true);
+    expect(urls.some((url) => url.includes('ve.dolarapi.com'))).toBe(true);
+    expect(urls.find((url) => url.includes('/history/binance'))).toContain(
+      'fiat=VES',
+    );
+    expect(urls.find((url) => url.includes('/history/binance'))).toContain(
+      'asset=USDT',
+    );
+    expect(urls.find((url) => url.includes('/history/binance'))).toContain(
+      'trade_type=SELL',
+    );
+    expect(history).toEqual([
+      {
+        capturedAt: '2026-11-11T08:00:00Z',
+        source: 'binance',
+        buyRate: 1079.999,
+        sellRate: null,
+        priceMethod: 'median',
+      },
+      {
+        capturedAt: '2026-11-11T00:00:00.000Z',
+        source: 'bcv',
+        buyRate: 901.6175,
+        sellRate: null,
+      },
+    ]);
   });
 });
+
+describe('fetchBinanceRateHistorySince', () => {
+  it('requests only the incremental window with a small page size and drops older samples', async () => {
+    const since = Date.parse('2026-11-10T00:00:00.000Z');
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        currencies: [
+          {
+            date: '2026-11-11T08:00:00.000Z',
+            median_price: 1_000,
+            average_price: 1_001,
+          },
+          {
+            date: '2026-11-09T08:00:00.000Z',
+            median_price: 900,
+            average_price: 901,
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchBinanceRateHistorySince(since);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = decodeURIComponent(String(fetchMock.mock.calls[0][0]));
+    expect(url).toContain('start_date=2026-11-10T00:00:00.000Z');
+    expect(url).toContain('limit=200');
+    expect(result).toHaveLength(1);
+    expect(result[0].buyRate).toBe(1_000);
+  });
+});
+
+describe('fetchHistoricalRateForDate', () => {
+  it('returns the exact BCV rate and the local-day median P2P sample', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 12, 12));
+    const targetDate = '2026-11-11';
+    const p2pSamples = [
+      { date: new Date(2026, 10, 11, 8).toISOString(), median_price: 1_070 },
+      { date: new Date(2026, 10, 11, 12).toISOString(), median_price: 1_080 },
+      { date: new Date(2026, 10, 11, 16).toISOString(), median_price: 1_090 },
+    ];
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/history/binance')
+          ? jsonResponse({ currencies: p2pSamples })
+          : jsonResponse([{ fecha: targetDate, promedio: 900 }]),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchHistoricalRateForDate(targetDate);
+
+    expect(result).toEqual({
+      bcv: {
+        value: 900,
+        capturedAt: `${targetDate}T00:00:00.000Z`,
+        forwardFilled: false,
+      },
+      binance: {
+        value: 1_080,
+        capturedAt: p2pSamples[1].date,
+        method: 'median',
+      },
+    });
+  });
+
+  it('labels the average-price fallback when median is unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 12, 12));
+    const targetDate = '2026-11-11';
+    const p2pTimestamp = new Date(2026, 10, 11, 12).toISOString();
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/history/binance')
+          ? jsonResponse({
+              currencies: [{ date: p2pTimestamp, average_price: 1_075 }],
+            })
+          : jsonResponse([{ fecha: targetDate, promedio: 900 }]),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchHistoricalRateForDate(targetDate);
+
+    expect(result.binance).toEqual({
+      value: 1_075,
+      capturedAt: p2pTimestamp,
+      method: 'average',
+    });
+  });
+
+  it('forward-fills BCV from the latest prior publication', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 12, 12));
+    const targetDate = '2026-11-11';
+    const p2pTimestamp = new Date(2026, 10, 11, 12).toISOString();
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/history/binance')
+          ? jsonResponse({
+              currencies: [{ date: p2pTimestamp, median_price: 1_080 }],
+            })
+          : jsonResponse([{ fecha: '2026-11-10', promedio: 895 }]),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchHistoricalRateForDate(targetDate);
+
+    expect(result.bcv).toEqual({
+      value: 895,
+      capturedAt: '2026-11-10T00:00:00.000Z',
+      forwardFilled: true,
+    });
+    expect(result.binance).toEqual({
+      value: 1_080,
+      capturedAt: p2pTimestamp,
+      method: 'median',
+    });
+  });
+
+  it('throws a typed error when the selected date has no P2P samples', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 12, 12));
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/history/binance')
+          ? jsonResponse({
+              currencies: [
+                {
+                  date: new Date(2026, 10, 10, 12).toISOString(),
+                  median_price: 1_070,
+                },
+              ],
+            })
+          : jsonResponse([{ fecha: '2026-11-11', promedio: 900 }]),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchHistoricalRateForDate('2026-11-11')).rejects.toBeInstanceOf(
+      HistoricalRateLookupError,
+    );
+  });
+
+  it('keeps an empty P2P history as a typed manual-entry error', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 12, 12));
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/history/binance')
+          ? jsonResponse({ currencies: [] })
+          : jsonResponse([{ fecha: '2026-11-11', promedio: 900 }]),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchHistoricalRateForDate('2026-11-11')).rejects.toMatchObject({
+      name: 'HistoricalRateLookupError',
+      code: 'no-binance-samples',
+    });
+  });
+
+  it('rejects future and out-of-range dates before making requests', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 12, 12));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchHistoricalRateForDate('2026-11-13')).rejects.toMatchObject({
+      code: 'future-date',
+    });
+    await expect(fetchHistoricalRateForDate('2025-11-11')).rejects.toMatchObject({
+      code: 'outside-lookback',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+

@@ -79,34 +79,43 @@ describe('purchase status machine', () => {
   it('exposes status order, Spanish labels, and sequential next statuses', () => {
     expect(PURCHASE_STATUS_ORDER).toEqual([
       'pending',
+      'approved',
       'usd_credited',
       'deposited_binance',
+      'partial',
       'completed',
       'cancelled',
     ] satisfies PurchaseStatus[]);
     expect(PURCHASE_STATUS_LABELS).toEqual({
-      pending: 'Pendiente',
-      usd_credited: 'Divisas acreditadas',
-      deposited_binance: 'Depositado a Binance',
-      completed: 'Vendido/Completado',
+      pending: 'En espera',
+      approved: 'Aprobado',
+      usd_credited: 'Acreditado',
+      deposited_binance: 'En Binance',
+      partial: 'Parcial',
+      completed: 'Completo',
       cancelled: 'Cancelado',
     });
-    expect(getNextStatuses('pending')).toEqual(['usd_credited', 'cancelled']);
+    expect(getNextStatuses('pending')).toEqual(['approved', 'cancelled']);
+    expect(getNextStatuses('approved')).toEqual(['usd_credited', 'cancelled']);
     expect(getNextStatuses('usd_credited')).toEqual(['deposited_binance', 'cancelled']);
-    expect(getNextStatuses('deposited_binance')).toEqual(['completed', 'cancelled']);
+    expect(getNextStatuses('deposited_binance')).toEqual([]);
+    expect(getNextStatuses('partial')).toEqual([]);
     expect(getNextStatuses('completed')).toEqual([]);
     expect(getNextStatuses('cancelled')).toEqual([]);
   });
 
-  it('allows only sequential progress and cancellation before completion', () => {
-    expect(canTransition('pending', 'usd_credited')).toBe(true);
+  it('allows only sequential progress before inventory funding', () => {
+    expect(canTransition('pending', 'approved')).toBe(true);
+    expect(canTransition('approved', 'usd_credited')).toBe(true);
     expect(canTransition('usd_credited', 'deposited_binance')).toBe(true);
-    expect(canTransition('deposited_binance', 'completed')).toBe(true);
+    expect(canTransition('pending', 'usd_credited')).toBe(false);
     expect(canTransition('pending', 'deposited_binance')).toBe(false);
     expect(canTransition('usd_credited', 'completed')).toBe(false);
+    expect(canTransition('deposited_binance', 'completed')).toBe(false);
     expect(canTransition('pending', 'cancelled')).toBe(true);
+    expect(canTransition('approved', 'cancelled')).toBe(true);
     expect(canTransition('usd_credited', 'cancelled')).toBe(true);
-    expect(canTransition('deposited_binance', 'cancelled')).toBe(true);
+    expect(canTransition('deposited_binance', 'cancelled')).toBe(false);
     expect(canTransition('completed', 'cancelled')).toBe(false);
     expect(canTransition('cancelled', 'pending')).toBe(false);
   });

@@ -94,11 +94,11 @@ describe('calculate base and bank fees', () => {
 
     expect(result.baseBs).toBe(89_927.05);
     expect(result.interventionFeeBs).toBe(449.64);
-    expect(result.interbankCostBs).toBe(269.78);
+    expect(result.interbankCostBs).toBe(271.13);
     expect(result.bcvPurchaseBs).toBe(90_376.69);
-    expect(result.amountBs).toBe(90_646.47);
-    expect(result.totalCostBs).toBe(90_646.47);
-    expect(result.snapshot.amountBs).toBe(90_646.47);
+    expect(result.amountBs).toBe(90_647.82);
+    expect(result.totalCostBs).toBe(90_647.82);
+    expect(result.snapshot.amountBs).toBe(90_647.82);
     expect(result.snapshot.netForPurchaseBs).toBe(89_927.05);
     expect(result.snapshot.baseBs).toBe(89_927.05);
   });
@@ -142,7 +142,7 @@ describe('calculate base and bank fees', () => {
     expect(result.totalCostBs).toBe(1_234.56);
   });
 
-  it('applies the interbank cost over Base_Bs or Base_Bs + intervention', () => {
+  it('applies the interbank cost sequentially over Base_Bs + intervention', () => {
     const initialBase = calculate(
       createInput({
         mode: 'usd',
@@ -168,12 +168,36 @@ describe('calculate base and bank fees', () => {
       }),
     );
 
-    expect(initialBase.interbankCostBs).toBe(12);
-    expect(initialBase.totalCostBs).toBe(4_032);
+    expect(initialBase.interbankCostBs).toBe(12.06);
+    expect(initialBase.totalCostBs).toBe(4_032.06);
     expect(netBase.interbankCostBs).toBe(12.06);
     expect(netBase.totalCostBs).toBe(4_032.06);
     expect(disabled.interbankCostBs).toBe(0);
     expect(disabled.totalCostBs).toBe(4_020);
+  });
+
+  it('calculates 100 USD at 70 with intervention then interbank sequentially', () => {
+    const result = calculate(
+      createInput({
+        mode: 'usd',
+        amount: 100,
+        bcvRate: 70,
+        binanceRate: 80,
+        options: createOptions({ interbankEnabled: true }),
+        profile: createProfile({
+          cardCommissionPct: 0,
+          binanceDepositPct: 0,
+          interbankPct: 0.3,
+          interbankBase: 'initial',
+        }),
+      }),
+    );
+
+    expect(result.baseBs).toBe(7_000);
+    expect(result.interventionFeeBs).toBe(35);
+    expect(result.bcvPurchaseBs).toBe(7_035);
+    expect(result.interbankCostBs).toBe(21.11);
+    expect(result.totalCostBs).toBe(7_056.11);
   });
 
   it('keeps VES card fees in Bs.S without reducing the USD flow', () => {
@@ -208,7 +232,7 @@ describe('calculate card, Binance and optional fees', () => {
     expect(result.usdForBinance).toBe(243.88);
   });
 
-  it('applies the Binance percentage on USD_2 and keeps the fixed fee for the sale', () => {
+  it('applies the Binance percentage on USD_2 and always reserves the fixed P2P fee', () => {
     const percentageOnly = calculate(
       createInput({ profile: createProfile({ binanceDepositFixedUsd: 0 }) }),
     );
@@ -220,8 +244,9 @@ describe('calculate card, Binance and optional fees', () => {
     const combined = calculate(createInput());
 
     expect(percentageOnly.binancePercentFeeUsd).toBe(2.44);
-    expect(percentageOnly.usdtNet).toBe(241.44);
-    expect(percentageOnly.bsOut).toBe(11_106.24);
+    expect(percentageOnly.binanceFixedFeeUsd).toBe(0.06);
+    expect(percentageOnly.usdtNet).toBe(241.38);
+    expect(percentageOnly.bsOut).toBe(11_103.48);
     expect(fixedOnly.binancePercentFeeUsd).toBe(0);
     expect(fixedOnly.usdDeposited).toBe(243.88);
     expect(fixedOnly.usdtNet).toBe(243.38);
@@ -373,6 +398,27 @@ describe('calculate profitability and break-even', () => {
 });
 
 describe('mandatory financial audit tests', () => {
+  it('enforces the mandatory 0.06 USDT fixed sale fee when the profile sets zero', () => {
+    const result = calculate(
+      createInput({
+        mode: 'usd',
+        amount: 100,
+        bcvRate: 100,
+        binanceRate: 1_000,
+        profile: createProfile({
+          cardCommissionPct: 0,
+          binanceDepositPct: 0,
+          binanceDepositFixedUsd: 0,
+        }),
+      }),
+    );
+
+    expect(result.binanceFixedFeeUsd).toBe(0.06);
+    expect(result.snapshot.binanceDepositFixedUsd).toBe(0.06);
+    expect(result.usdtNet).toBe(99.94);
+    expect(result.bsOut).toBe(99_940);
+  });
+
   it('deducts the fixed 0.06 USDT P2P fee at the effective sale rate', () => {
     const result = calculate(
       createInput({
@@ -398,15 +444,15 @@ describe('mandatory financial audit tests', () => {
   it('reproduces the audited 100 USD bank operation', () => {
     const result = calculate(auditedInput);
 
-    expect(result.amountBs).toBe(90_646.47);
-    expect(result.totalCostBs).toBe(90_646.47);
+    expect(result.amountBs).toBe(90_647.82);
+    expect(result.totalCostBs).toBe(90_647.82);
     expect(result.usdForBinance).toBe(97.56);
     expect(result.usdDeposited).toBe(93.56);
     expect(result.usdtNet).toBe(93.5);
     expect(result.bsOut).toBe(100_774.3);
     expect(result.grossSaleBs).toBe(100_838.97);
     expect(result.binanceFixedDiscountBs).toBe(64.67);
-    expect(result.effectiveBuyRate).toBeCloseTo(969.48, 2);
+    expect(result.effectiveBuyRate).toBeCloseTo(969.5, 2);
     expect(result.breakEvenRate).toBe(result.effectiveBuyRate);
   });
 
@@ -491,10 +537,10 @@ describe('calculation waterfall', () => {
       'total-cost',
       'net-profit',
     ]);
-    expect(lines.get('investment')?.amountBs).toBe(4_032);
+    expect(lines.get('investment')?.amountBs).toBe(4_032.06);
     expect(lines.get('net-purchase')?.amountBs).toBe(4_000);
     expect(lines.get('intervention')?.amountBs).toBe(-20);
-    expect(lines.get('interbank')?.amountBs).toBe(-12);
+    expect(lines.get('interbank')?.amountBs).toBe(-12.06);
     expect(lines.get('card-commission')?.amountUsd).toBe(-1.96);
     expect(lines.get('igtf')?.amountUsd).toBe(-0.06);
     expect(lines.get('binance-deposit')?.amountUsd).toBe(-0.98);

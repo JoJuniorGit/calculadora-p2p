@@ -11,6 +11,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "idb-keyval": "^6.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^3.23.8",
@@ -19,10 +23,18 @@
   "devDependencies": {
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
+    "@vite-pwa/assets-generator": "^2.0.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "fake-indexeddb": "^6.2.8",
     "jsdom": "^25.0.0",
     "typescript": "^5.6.2",
     "vite": "^5.4.3",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^2.1.1"
-  }
+  },
+  "description": "Herramienta local y offline-first para simular y llevar un registro de operaciones P2P entre Bs.S y USD/USDT. No tiene backend ni autenticación: los datos se guardan en el navegador, y solo se necesita conexión para solicitar actualizaciones opcionales de tasas.",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

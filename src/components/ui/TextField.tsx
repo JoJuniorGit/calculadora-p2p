@@ -10,6 +10,9 @@ export interface TextFieldProps {
   disabled?: boolean;
   placeholder?: string;
   name?: string;
+  type?: 'text' | 'date';
+  min?: string;
+  max?: string;
 }
 
 export function TextField({
@@ -21,6 +24,9 @@ export function TextField({
   disabled = false,
   placeholder,
   name,
+  type = 'text',
+  min,
+  max,
 }: TextFieldProps) {
   const fieldId = useId();
   const hintId = `${fieldId}-hint`;
@@ -36,11 +42,13 @@ export function TextField({
         id={fieldId}
         name={name}
         className={styles.input}
-        type="text"
+        type={type}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
         disabled={disabled}
         placeholder={placeholder}
+        min={min}
+        max={max}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
       />

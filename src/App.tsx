@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from './store/useAppStore';
 import { Button } from './components/ui/Button';
+import { PwaNotices } from './components/pwa/PwaNotices';
 import {
   getExchangeGap,
   PROFITABILITY_GREEN_MIN_PCT,
@@ -143,12 +144,32 @@ export default function App() {
 
   return (
     <main className={styles.app}>
-      <div className={styles.container}>
+      <div className={styles.shell}>
         <header className={styles.header}>
           <div className={styles.brand}>
-            <h1>Calculadora P2P</h1>
-            <p>Arbitraje USD/VES</p>
+            <span className={styles.brandMark} aria-hidden="true">P2P</span>
+            <div className={styles.brandCopy}>
+              <h1>Calculadora P2P</h1>
+              <p>Arbitraje USD/VES</p>
+            </div>
           </div>
+
+          <nav className={styles.tabs} aria-label="Navegación principal">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={styles.tab}
+                type="button"
+                aria-current={activeTab === tab.id ? 'page' : undefined}
+                aria-keyshortcuts={`Alt+${tabs.indexOf(tab) + 1}`}
+                data-shortcut={`Alt+${tabs.indexOf(tab) + 1}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
           <div className={styles.headerActions}>
             <Button
               variant="secondary"
@@ -180,7 +201,7 @@ export default function App() {
           <span className={styles.tickerItem}>
             <span className={styles.tickerLabel}>Brecha:</span>
             <strong className={`${styles.tickerValue} ${gapValueClassName}`}>
-              {exchangeGap ? formatPct(exchangeGap.pct, 2) : '—'}
+              {exchangeGap ? formatPct(exchangeGap.pct, 2) : '-'}
             </strong>
           </span>
         </div>
@@ -190,22 +211,6 @@ export default function App() {
             {disclaimer.text}
           </aside>
         )}
-
-        <nav className={styles.tabs} aria-label="Navegación principal">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={styles.tab}
-              type="button"
-              aria-current={activeTab === tab.id ? 'page' : undefined}
-              aria-keyshortcuts={`Alt+${tabs.indexOf(tab) + 1}`}
-              data-shortcut={`Alt+${tabs.indexOf(tab) + 1}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
 
         <div className={styles.content}>
           {activeTab === 'rates' && (
@@ -219,6 +224,7 @@ export default function App() {
           {activeTab === 'records' && <PurchasesPanel />}
         </div>
       </div>
+      <PwaNotices />
     </main>
   );
 }

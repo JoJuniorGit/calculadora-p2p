@@ -15,6 +15,7 @@ export interface SelectFieldProps {
   hint?: string;
   disabled?: boolean;
   name?: string;
+  inline?: boolean;
 }
 
 export function SelectField({
@@ -26,6 +27,7 @@ export function SelectField({
   hint,
   disabled = false,
   name,
+  inline = false,
 }: SelectFieldProps) {
   const fieldId = useId();
   const hintId = `${fieldId}-hint`;
@@ -33,8 +35,8 @@ export function SelectField({
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
 
   return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={fieldId}>
+    <div className={`${styles.field} ${inline ? styles.inlineField : ''}`}>
+      <label className={inline ? styles.inlineLabel : styles.label} htmlFor={fieldId}>
         {label}
       </label>
       <select
