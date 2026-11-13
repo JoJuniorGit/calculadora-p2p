@@ -125,7 +125,7 @@ describe('fetchBinanceRate', () => {
     vi.stubEnv('DEV', false);
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === '/api/binance-rate') {
-        return Promise.resolve(jsonResponse({ value: 1046.9, provider: 'Binance P2P (proxy)' }));
+        return Promise.resolve(jsonResponse({ value: 1046.9, provider: 'Binance P2P' }));
       }
       return Promise.resolve(failedResponse(404));
     });

@@ -281,7 +281,7 @@ async function fetchYadioRate(): Promise<FetchedRate> {
 }
 
 async function fetchBinanceServerRate(): Promise<FetchedRate> {
-  const service = 'Binance P2P (proxy)';
+  const service = 'Binance P2P';
 
   return withTimeout(
     service,

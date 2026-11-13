@@ -68,7 +68,7 @@ export default async function handler(request, response) {
     response.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
     response.status(200).json({
       value: median(prices),
-      provider: 'Binance P2P (proxy)',
+      provider: 'Binance P2P',
     });
   } catch {
     response.status(502).json({ error: 'No se pudo consultar Binance P2P.' });
