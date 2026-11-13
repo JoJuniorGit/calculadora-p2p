@@ -21,5 +21,5 @@ export default defineConfig({
       resizeOptions: { fit: 'contain', background: BRAND_BLUE },
     },
   },
-  images: ['assets/icon-source.svg'],
+  images: ['public/icon-source.svg'],
 });
